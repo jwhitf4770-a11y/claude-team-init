@@ -10,12 +10,21 @@ const PRICES = {
 
 const ONE_TIME_PLANS = ['starter'];
 
+// Promo code → coupon mapping
+const PROMO_CODES = {
+  BIGSKY: {
+    starter: 'BIGSKY',     // 100% off one-time
+    pro: 'BIGSKY3MO',      // 3 months free
+    team: 'BIGSKY3MO',     // 3 months free
+  },
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { plan, email } = req.body;
+  const { plan, email, code } = req.body;
 
   if (!plan || !PRICES[plan]) {
     return res.status(400).json({ error: 'Invalid plan' });
@@ -23,16 +32,32 @@ export default async function handler(req, res) {
 
   const isOneTime = ONE_TIME_PLANS.includes(plan);
 
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: isOneTime ? 'payment' : 'subscription',
-      customer_email: email || undefined,
-      line_items: [{ price: PRICES[plan], quantity: 1 }],
-      success_url: `${process.env.SITE_URL || 'https://codecrew-mu.vercel.app'}/?upgraded=${plan}`,
-      cancel_url: `${process.env.SITE_URL || 'https://codecrew-mu.vercel.app'}/?cancelled=true`,
-      metadata: { plan },
-    });
+  const sessionParams = {
+    mode: isOneTime ? 'payment' : 'subscription',
+    customer_email: email || undefined,
+    line_items: [{ price: PRICES[plan], quantity: 1 }],
+    success_url: `${process.env.SITE_URL || 'https://codecrew-mu.vercel.app'}/?upgraded=${plan}`,
+    cancel_url: `${process.env.SITE_URL || 'https://codecrew-mu.vercel.app'}/?cancelled=true`,
+    metadata: { plan },
+  };
 
+  // Apply promo code if provided
+  const upperCode = (code || '').toUpperCase().trim();
+  if (upperCode && PROMO_CODES[upperCode]) {
+    const couponId = PROMO_CODES[upperCode][plan];
+    if (couponId) {
+      if (isOneTime) {
+        sessionParams.discounts = [{ coupon: couponId }];
+      } else {
+        sessionParams.discounts = [{ coupon: couponId }];
+      }
+    }
+  } else if (upperCode) {
+    return res.status(400).json({ error: 'Invalid promo code' });
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.create(sessionParams);
     res.json({ url: session.url });
   } catch (err) {
     res.status(500).json({ error: err.message });

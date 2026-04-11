@@ -414,6 +414,13 @@
       <button class="price-btn team" onclick="checkout('team')">Start Team — $29/mo</button>
     </div>
   </div>
+
+  <div style="text-align: center; margin-top: 24px;">
+    <div style="display: inline-flex; gap: 8px; align-items: center;">
+      <input type="text" id="promoCode" placeholder="Promo code" style="padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; width: 160px; font-family: 'JetBrains Mono', monospace;">
+      <span style="color: var(--muted); font-size: 13px;">Have a code? Enter it before checkout.</span>
+    </div>
+  </div>
 </section>
 
 <!-- Final CTA -->
@@ -436,11 +443,12 @@
 
 <script>
 async function checkout(plan) {
+  const code = (document.getElementById('promoCode')?.value || '').trim();
   try {
     const res = await fetch('/api/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan }),
+      body: JSON.stringify({ plan, code: code || undefined }),
     });
     const data = await res.json();
     if (data.url) window.location.href = data.url;
