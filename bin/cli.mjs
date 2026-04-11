@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { resolve } from 'path';
+import { spawn } from 'child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
@@ -10,6 +11,7 @@ import { generateCachehook } from '../src/generators/cachehook.mjs';
 import { generateLauncher } from '../src/generators/launcher.mjs';
 import { generateClaudeMd } from '../src/generators/claudemd.mjs';
 import { generateSettings } from '../src/generators/settings.mjs';
+import { generateHooks } from '../src/generators/hooks.mjs';
 import { deployFlyio } from '../src/deployers/flyio.mjs';
 
 const VERSION = '0.1.0';
@@ -27,7 +29,12 @@ async function main() {
     process.exit(0);
   }
 
-  const projectDir = resolve(args[0] || '.');
+  const yesAll = args.includes('--yes') || args.includes('-y');
+  const skipCache = args.includes('--no-cache');
+  const skipAudit = args.includes('--no-audit');
+  const dryRun = args.includes('--dry-run');
+  const positionalArgs = args.filter(a => !a.startsWith('-'));
+  const projectDir = resolve(positionalArgs[0] || '.');
 
   console.log('');
   console.log(chalk.bold.cyan('  claude-team-init'));
@@ -39,7 +46,7 @@ async function main() {
   let audit;
   try {
     audit = await auditCodebase(projectDir);
-    spinner.succeed(`Found: ${chalk.bold(audit.framework || audit.language)} project`);
+    spinner.succeed(`Found: ${chalk.bold(audit.framework || audit.language || 'unknown')} project`);
   } catch (err) {
     spinner.fail('Could not scan codebase');
     console.error(chalk.red(err.message));
@@ -62,7 +69,7 @@ async function main() {
   if (audit.hasMobile)   console.log(`    Mobile:       ${chalk.green('yes')}`);
   console.log('');
 
-  // Step 2: Confirm agent plan
+  // Step 2: Show agent plan
   const agentPlan = buildAgentPlan(audit);
 
   console.log(chalk.bold('  Agents to generate:'));
@@ -74,30 +81,54 @@ async function main() {
   }
   console.log('');
 
-  const { proceed } = await inquirer.prompt([{
-    type: 'confirm',
-    name: 'proceed',
-    message: 'Generate these agents?',
-    default: true
-  }]);
-
-  if (!proceed) {
-    console.log(chalk.yellow('Aborted.'));
+  if (dryRun) {
+    console.log(chalk.yellow('  Dry run — no files written.'));
+    console.log('');
+    console.log(chalk.bold('  Files that would be created:'));
+    for (const agent of agentPlan) {
+      console.log(`    ${chalk.gray(`.claude/agents/${agent.name}.md`)}`);
+    }
+    console.log(`    ${chalk.gray('.claude/settings.local.json')}`);
+    console.log(`    ${chalk.gray('.claude/rules.json')}`);
+    console.log(`    ${chalk.gray('scripts/team-launch.sh')}`);
+    if (!skipCache) console.log(`    ${chalk.gray('scripts/cache-hook.sh')}`);
+    console.log(`    ${chalk.gray('CLAUDE.md')}`);
+    console.log('');
     process.exit(0);
   }
 
-  // Step 3: Fly.io setup
-  console.log('');
-  const { setupCache } = await inquirer.prompt([{
-    type: 'confirm',
-    name: 'setupCache',
-    message: 'Set up Fly.io cache server? ($3/month — saves $20-40/day on heavy usage)',
-    default: true
-  }]);
+  // Confirm (skip with --yes)
+  if (!yesAll) {
+    const { proceed } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'proceed',
+      message: 'Generate these agents?',
+      default: true
+    }]);
+    if (!proceed) {
+      console.log(chalk.yellow('Aborted.'));
+      process.exit(0);
+    }
+  }
 
+  // Step 3: Fly.io cache
   let cacheConfig = null;
-  if (setupCache) {
-    cacheConfig = await deployFlyio(projectDir, audit);
+  if (!skipCache) {
+    if (!yesAll) {
+      const { setupCache } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'setupCache',
+        message: 'Set up Fly.io cache server? ($3/month — saves $20-40/day on heavy usage)',
+        default: true
+      }]);
+      if (setupCache) {
+        cacheConfig = await deployFlyio(projectDir, audit);
+      }
+    } else {
+      cacheConfig = await deployFlyio(projectDir, audit);
+    }
+  } else {
+    console.log(chalk.gray('  Skipping Fly.io cache (--no-cache)'));
   }
 
   // Step 4: Generate everything
@@ -114,6 +145,8 @@ async function main() {
     await generateClaudeMd(projectDir, audit, agentPlan, cacheConfig);
     genSpinner.text = 'Generating settings...';
     await generateSettings(projectDir, audit);
+    genSpinner.text = 'Configuring agent hooks...';
+    await generateHooks(projectDir, audit, agentPlan, cacheConfig);
     genSpinner.succeed('Agent team generated!');
   } catch (err) {
     genSpinner.fail('Generation failed');
@@ -125,15 +158,16 @@ async function main() {
   console.log('');
   console.log(chalk.bold.green('  Setup complete!'));
   console.log('');
-  console.log(chalk.bold('  Quick start:'));
-  console.log(`    ${chalk.cyan('claude --agent build-gate')}         Check your build`);
-  console.log(`    ${chalk.cyan('claude --agent qa-signoff')}         Full QA pass`);
-  console.log(`    ${chalk.cyan('./scripts/team-launch.sh "fix X"')}  Orchestrator mode`);
-  console.log(`    ${chalk.cyan('./scripts/team-launch.sh --monitor')} Watch progress`);
+  console.log(chalk.bold('  Inside Claude Code, just type:'));
+  console.log(`    ${chalk.cyan('/team-audit')}       Audit + fix your entire codebase`);
+  console.log(`    ${chalk.cyan('/team-review')}      Quick agent team fitness check`);
+  console.log(`    ${chalk.cyan('/team-launch')}      Parallel orchestrator mode`);
+  console.log(`    ${chalk.cyan('/team-init')}        Re-run this setup`);
   console.log('');
   console.log(chalk.bold('  Files created:'));
   console.log(`    ${chalk.gray('.claude/agents/')}        ${agentPlan.length} agent definitions`);
-  console.log(`    ${chalk.gray('.claude/settings.local.json')}  Permission guardrails`);
+  console.log(`    ${chalk.gray('.claude/settings.local.json')}  Permissions + hooks`);
+  console.log(`    ${chalk.gray('.claude/rules.json')}     Agent trigger rules`);
   console.log(`    ${chalk.gray('scripts/team-launch.sh')}  Parallel orchestrator launcher`);
   if (cacheConfig) {
     console.log(`    ${chalk.gray('scripts/cache-hook.sh')} Fly.io cache integration`);
@@ -143,48 +177,83 @@ async function main() {
   if (cacheConfig) {
     console.log(chalk.gray(`  Cache server: ${cacheConfig.url}`));
     console.log(chalk.gray(`  Estimated savings: $20-40/day on heavy usage`));
+    console.log('');
   }
+
+  // Step 6: Run audit (skip with --no-audit)
+  let runAudit = !skipAudit;
+  if (!yesAll && !skipAudit) {
+    const answer = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'runAudit',
+      message: 'Run team audit now? (finds problems + fixes them)',
+      default: true
+    }]);
+    runAudit = answer.runAudit;
+  }
+
+  if (runAudit) {
+    console.log('');
+    console.log(chalk.bold.cyan('  Launching team audit...'));
+    console.log(chalk.gray('  Scanning for dead code, security holes, bad patterns — then fixing them.'));
+    console.log('');
+
+    try {
+      const child = spawn('claude', ['--agent', 'team-audit', '-p',
+        'Run a full team audit of this codebase. Find every issue — dead code, duplication, security holes, bad patterns, missing essentials. Fix everything to 95% confidence. Write TEAM-AUDIT-REPORT.md.'],
+        { cwd: projectDir, stdio: 'inherit' });
+
+      await new Promise((res, rej) => {
+        child.on('close', (code) => {
+          if (code === 0) res();
+          else rej(new Error(`team-audit exited with code ${code}`));
+        });
+        child.on('error', rej);
+      });
+
+      console.log('');
+      console.log(chalk.bold.green('  Audit complete! See TEAM-AUDIT-REPORT.md'));
+    } catch (err) {
+      console.log('');
+      console.log(chalk.yellow(`  Audit skipped: ${err.message}`));
+      console.log(chalk.gray('  Run it later: /team-audit'));
+    }
+  }
+
   console.log('');
 }
 
 function buildAgentPlan(audit) {
   const agents = [
-    // Always generated
     { name: 'build-gate', model: 'haiku', reason: 'Build + lint verification' },
     { name: 'qa-signoff', model: 'haiku', reason: 'Final QA with physical proof' },
     { name: 'regression-checker', model: 'haiku', reason: 'Side effect detection' },
     { name: 'orchestrator', model: 'opus', reason: '3-solution finder with confidence scoring' },
+    { name: 'team-audit', model: 'opus', reason: 'Full code audit + auto-fix to 95% confidence' },
+    { name: 'team-review', model: 'opus', reason: 'Fast agent team fitness evaluation' },
   ];
 
-  // Conditional agents
   if (audit.testCmd) {
     agents.push({ name: 'test-writer', model: 'haiku', reason: `Test generation (${audit.testRunner || 'detected'})` });
   }
-
   if (audit.hasApi) {
     agents.push({ name: 'api-prober', model: 'haiku', reason: 'API endpoint testing' });
   }
-
   if (audit.auth) {
     agents.push({ name: 'auth-verifier', model: 'sonnet', reason: `Auth flow validation (${audit.auth})` });
   }
-
   if (audit.payments) {
     agents.push({ name: 'billing-bot', model: 'sonnet', reason: `Payment integration (${audit.payments})` });
   }
-
   if (audit.storage) {
     agents.push({ name: 'upload-bot', model: 'sonnet', reason: `Storage/upload validation (${audit.storage})` });
   }
-
   if (audit.database) {
     agents.push({ name: 'security-reviewer', model: 'sonnet', reason: `DB security audit (${audit.database})` });
   }
-
   if (audit.hasMobile) {
     agents.push({ name: 'mobile-expert', model: 'sonnet', reason: 'Mobile compatibility check' });
   }
-
   if (audit.hasCrypto) {
     agents.push({ name: 'crypto-auditor', model: 'sonnet', reason: 'Encryption integrity audit' });
   }
@@ -194,33 +263,27 @@ function buildAgentPlan(audit) {
 
 function printHelp() {
   console.log(`
-${chalk.bold('claude-team-init')} — AI agent team bootstrapper
+${chalk.bold('claude-team-init')} — Senior engineering team for your AI-generated code
 
 ${chalk.bold('Usage:')}
-  npx claude-team-init [project-dir]
-  npx claude-team-init .
-  npx claude-team-init ~/my-project
-
-${chalk.bold('What it does:')}
-  1. Scans your codebase (language, framework, DB, auth, etc.)
-  2. Generates specialized AI agents tailored to your stack
-  3. Sets up a Fly.io cache server ($3/mo) for agent coordination
-  4. Creates a team launcher for parallel orchestrator sessions
-  5. Writes CLAUDE.md with workflow rules
+  claude-team-init                 Set up in current directory
+  claude-team-init ~/my-project    Set up in another directory
+  claude-team-init -y              Accept all defaults (fewest keystrokes)
+  claude-team-init -y --no-cache   Skip Fly.io, just generate agents
 
 ${chalk.bold('Options:')}
+  -y, --yes       Accept all defaults — no prompts
   -h, --help      Show this help
   -v, --version   Show version
-  --no-cache      Skip Fly.io setup
-  --dry-run       Show what would be generated without writing files
+  --no-cache      Skip Fly.io cache setup
+  --no-audit      Skip initial code audit
+  --dry-run       Preview without writing files
 
-${chalk.bold('Agents generated:')}
-  Always:  build-gate, qa-signoff, regression-checker, orchestrator
-  If API:  api-prober
-  If auth: auth-verifier
-  If DB:   security-reviewer
-  If pay:  billing-bot
-  And more based on what's detected...
+${chalk.bold('After setup, inside Claude Code:')}
+  /team-audit     Audit + fix your entire codebase
+  /team-review    Quick agent team fitness check
+  /team-launch    Parallel orchestrator mode
+  /team-init      Re-run setup
 
 ${chalk.bold('Learn more:')} https://github.com/jwhitf4770-a11y/claude-team-init
 `);

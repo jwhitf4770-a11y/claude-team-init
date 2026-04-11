@@ -16,11 +16,35 @@ export async function auditCodebase(projectDir) {
     storage: null,
     hasApi: false,
     hasMobile: false,
+    mobilePlatforms: [],    // e.g. ['ios', 'android', 'flutter', 'react-native']
     hasCrypto: false,
     hasDocker: false,
     hasCi: false,
     detectedFiles: [],
+    subprojects: [],       // e.g. [{name: 'web', dir: 'web/', framework: 'Next.js'}]
+    projectRoot: projectDir,
+    webDir: null,           // resolved subdirectory for web app (if any)
   };
+
+  // Check for common subdirectory layouts (monorepo / multi-platform)
+  const subdirs = ['web', 'app', 'frontend', 'backend', 'server', 'api', 'src',
+                   'packages/web', 'packages/app', 'apps/web', 'apps/api'];
+  for (const sub of subdirs) {
+    if (await fileExists(projectDir, join(sub, 'package.json'))) {
+      audit.subprojects.push({ name: sub, dir: join(projectDir, sub) });
+      if (!audit.webDir && ['web', 'app', 'frontend', 'apps/web', 'packages/web'].includes(sub)) {
+        audit.webDir = join(projectDir, sub);
+      }
+    }
+    if (await fileExists(projectDir, join(sub, 'requirements.txt')) ||
+        await fileExists(projectDir, join(sub, 'pyproject.toml'))) {
+      audit.subprojects.push({ name: sub, dir: join(projectDir, sub) });
+    }
+  }
+
+  // If we found a web subdirectory, scan it as the primary project
+  // but keep projectDir as the root for agent generation
+  const scanDir = audit.webDir || projectDir;
 
   // Detect language and package manager
   const checks = [
@@ -43,15 +67,15 @@ export async function auditCodebase(projectDir) {
   ];
 
   for (const check of checks) {
-    if (await fileExists(projectDir, check.file)) {
+    if (await fileExists(scanDir, check.file)) {
       audit.language = audit.language || check.lang;
       audit.packageMgr = audit.packageMgr || check.pkg;
       audit.detectedFiles.push(check.file);
     }
   }
 
-  // Parse package.json for JS/TS projects
-  const pkgJson = await readJsonSafe(projectDir, 'package.json');
+  // Parse package.json for JS/TS projects (scan the web/app subdir if found)
+  const pkgJson = await readJsonSafe(scanDir, 'package.json');
   if (pkgJson) {
     const deps = {
       ...pkgJson.dependencies,
@@ -71,13 +95,14 @@ export async function auditCodebase(projectDir) {
     else if (deps['fastify'])       audit.framework = 'Fastify';
     else if (deps['hono'])          audit.framework = 'Hono';
 
-    // Build command
-    if (scripts.build)        audit.buildCmd = 'npm run build';
-    else if (scripts.compile) audit.buildCmd = 'npm run compile';
+    // Build command (prefix with cd if scanning a subdirectory)
+    const cdPrefix = audit.webDir ? `cd ${audit.webDir.split('/').pop()} && ` : '';
+    if (scripts.build)        audit.buildCmd = `${cdPrefix}npm run build`;
+    else if (scripts.compile) audit.buildCmd = `${cdPrefix}npm run compile`;
 
     // Test command and runner
     if (scripts.test) {
-      audit.testCmd = 'npm test';
+      audit.testCmd = `${cdPrefix}npm test`;
       if (deps['jest'] || deps['@jest/core'])     audit.testRunner = 'Jest';
       else if (deps['vitest'])                     audit.testRunner = 'Vitest';
       else if (deps['mocha'])                      audit.testRunner = 'Mocha';
@@ -97,7 +122,7 @@ export async function auditCodebase(projectDir) {
     // Auth
     if (deps['next-auth'] || deps['@auth/core'])   audit.auth = 'NextAuth';
     else if (deps['@clerk/nextjs'])                audit.auth = 'Clerk';
-    else if (deps['@supabase/auth-helpers-nextjs']) audit.auth = 'Supabase Auth';
+    else if (deps['@supabase/ssr'] || deps['@supabase/auth-helpers-nextjs']) audit.auth = 'Supabase Auth';
     else if (deps['firebase'])                     audit.auth = audit.auth || 'Firebase Auth';
     else if (deps['passport'])                     audit.auth = 'Passport';
     else if (deps['lucia'])                        audit.auth = 'Lucia';
@@ -121,8 +146,8 @@ export async function auditCodebase(projectDir) {
   }
 
   // Python framework detection
-  const pyproject = await readFileSafe(projectDir, 'pyproject.toml');
-  const requirements = await readFileSafe(projectDir, 'requirements.txt');
+  const pyproject = await readFileSafe(scanDir, 'pyproject.toml');
+  const requirements = await readFileSafe(scanDir, 'requirements.txt');
   const pyDeps = (pyproject || '') + (requirements || '');
 
   if (pyDeps) {
@@ -137,7 +162,7 @@ export async function auditCodebase(projectDir) {
   }
 
   // Ruby framework detection
-  const gemfile = await readFileSafe(projectDir, 'Gemfile');
+  const gemfile = await readFileSafe(scanDir, 'Gemfile');
   if (gemfile) {
     if (gemfile.includes('rails'))        audit.framework = audit.framework || 'Rails';
     if (gemfile.includes('rspec'))        { audit.testCmd = audit.testCmd || 'bundle exec rspec'; audit.testRunner = 'RSpec'; }
@@ -145,7 +170,7 @@ export async function auditCodebase(projectDir) {
   }
 
   // Go detection
-  const goMod = await readFileSafe(projectDir, 'go.mod');
+  const goMod = await readFileSafe(scanDir, 'go.mod');
   if (goMod) {
     audit.buildCmd = audit.buildCmd || 'go build ./...';
     audit.testCmd = audit.testCmd || 'go test ./...';
@@ -156,7 +181,7 @@ export async function auditCodebase(projectDir) {
   }
 
   // Rust detection
-  const cargoToml = await readFileSafe(projectDir, 'Cargo.toml');
+  const cargoToml = await readFileSafe(scanDir, 'Cargo.toml');
   if (cargoToml) {
     audit.buildCmd = audit.buildCmd || 'cargo build';
     audit.testCmd = audit.testCmd || 'cargo test';
@@ -166,10 +191,11 @@ export async function auditCodebase(projectDir) {
     else if (cargoToml.includes('rocket')) audit.framework = audit.framework || 'Rocket';
   }
 
-  // API routes detection
+  // API routes detection (scan both root and web subdir)
   const apiPatterns = [
     'app/api/**', 'src/api/**', 'pages/api/**', 'routes/**',
     'src/routes/**', 'app/routes/**', 'controllers/**',
+    'web/app/api/**', 'server/api/**', 'backend/api/**',
   ];
   for (const pattern of apiPatterns) {
     const matches = await glob(pattern, { cwd: projectDir, nodir: true });
@@ -179,17 +205,60 @@ export async function auditCodebase(projectDir) {
     }
   }
 
-  // Mobile detection
-  const mobilePatterns = [
-    'ios/**', 'android/**', 'lib/main.dart', 'App.tsx',
-    '*-ios/**', '*-android/**',
-  ];
-  for (const pattern of mobilePatterns) {
-    const matches = await glob(pattern, { cwd: projectDir, nodir: true });
-    if (matches.length > 0) {
-      audit.hasMobile = true;
-      break;
+  // Mobile detection — per-platform
+  const iosFiles = await glob('{ios,iOS,*-ios}/**/*.swift', { cwd: projectDir, nodir: true });
+  const watchFiles = await glob('{Watch,watchOS,WatchKit}/**/*.swift', { cwd: projectDir, nodir: true });
+  const androidFiles = await glob('{android,*-android}/**/*.{kt,java}', { cwd: projectDir, nodir: true });
+  const flutterFile = await glob('lib/main.dart', { cwd: projectDir, nodir: true });
+  const rnFile = await glob('App.tsx', { cwd: projectDir, nodir: true });
+
+  if (iosFiles.length > 0 || watchFiles.length > 0) audit.mobilePlatforms.push('ios');
+  if (watchFiles.length > 0) audit.mobilePlatforms.push('watchos');
+  if (androidFiles.length > 0) audit.mobilePlatforms.push('android');
+  if (flutterFile.length > 0) audit.mobilePlatforms.push('flutter');
+  if (rnFile.length > 0) audit.mobilePlatforms.push('react-native');
+  audit.hasMobile = audit.mobilePlatforms.length > 0;
+
+  // iOS/Swift specific detection
+  const swiftFiles = await glob('**/*.swift', {
+    cwd: projectDir, nodir: true, ignore: ['node_modules/**', '.build/**', 'Pods/**']
+  });
+  if (swiftFiles.length > 0) {
+    audit.hasMobile = true;
+    if (!audit.mobilePlatforms.includes('ios')) audit.mobilePlatforms.push('ios');
+    if (!audit.language) audit.language = 'Swift';
+
+    // Detect Xcode project for build/test commands
+    const xcodeProjects = await glob('*.xcodeproj', { cwd: projectDir });
+    const xcworkspaces = await glob('*.xcworkspace', { cwd: projectDir });
+    if (xcworkspaces.length > 0 || xcodeProjects.length > 0) {
+      const workspace = xcworkspaces[0];
+      const project = xcodeProjects[0];
+      if (workspace) {
+        // Detect scheme from workspace name
+        const schemeName = workspace.replace('.xcworkspace', '');
+        audit.iosBuildCmd = `xcodebuild -workspace ${workspace} -scheme ${schemeName} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build`;
+        audit.iosTestCmd = `xcodebuild -workspace ${workspace} -scheme ${schemeName} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' test`;
+      } else if (project) {
+        const schemeName = project.replace('.xcodeproj', '');
+        audit.iosBuildCmd = `xcodebuild -project ${project} -scheme ${schemeName} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' build`;
+        audit.iosTestCmd = `xcodebuild -project ${project} -scheme ${schemeName} -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 16' test`;
+      }
     }
+
+    // Check for Supabase in Swift
+    for (const sf of swiftFiles.slice(0, 20)) {
+      const content = await readFileSafe(projectDir, sf);
+      if (content && content.includes('supabase')) {
+        audit.database = audit.database || 'Supabase';
+        break;
+      }
+    }
+  }
+
+  // Supabase directory detection (common in multi-platform projects)
+  if (await fileExists(projectDir, 'supabase')) {
+    audit.database = audit.database || 'Supabase';
   }
 
   // Docker

@@ -103,6 +103,47 @@ ${cacheConfig ? `
   log "Cleanup windows:   \${BOLD}$0 --cleanup\${NC}"
 }
 
+monitor_orchestrators() {
+  log "Monitoring orchestrator sessions (Ctrl+C to stop)..."
+  echo ""
+  while true; do
+    local running=0 finished=0 failed=0
+    for window in $(tmux list-windows -t "$TMUX_SESSION" -F '#{window_name}' 2>/dev/null || echo ""); do
+      if [[ "$window" == orch-* ]]; then
+        local logfile="/tmp/orch-team-*.log"
+        # Check if the orchestrator has finished
+        if ls /tmp/orch-team-*.log &>/dev/null; then
+          for lf in /tmp/orch-team-*.log; do
+            if grep -q "ORCHESTRATOR.*FINISHED" "$lf" 2>/dev/null; then
+              if grep -q "ACCEPTED" "$lf" 2>/dev/null; then
+                ((finished++))
+              elif grep -q "FAIL" "$lf" 2>/dev/null; then
+                ((failed++))
+              else
+                ((running++))
+              fi
+            else
+              ((running++))
+            fi
+          done
+        else
+          ((running++))
+        fi
+      fi
+    done
+
+    printf "\\r\${BOLD}[%s]\${NC} Running: \${CYAN}%d\${NC}  Finished: \${GREEN}%d\${NC}  Failed: \${RED}%d\${NC}  " \\
+      "$(date +%H:%M:%S)" "$running" "$finished" "$failed"
+
+    if [ "$running" -eq 0 ] && [ $((finished + failed)) -gt 0 ]; then
+      echo ""
+      ok "All orchestrators complete! (\${finished} succeeded, \${failed} failed)"
+      break
+    fi
+    sleep "\$MONITOR_INTERVAL"
+  done
+}
+
 cleanup_windows() {
   log "Cleaning up..."
   local cleaned=0
@@ -134,6 +175,7 @@ Team Launch — Parallel Orchestrator Sessions
 Usage:
   team-launch.sh "problem 1" "problem 2" ...    Launch orchestrators
   team-launch.sh -f problems.txt                Load from file
+  team-launch.sh --monitor                      Watch orchestrator progress
   team-launch.sh --cleanup                      Remove orchestrator windows + worktrees
   team-launch.sh --help                         Show this help
 
@@ -144,6 +186,7 @@ USAGE
 
 case "\${1:-}" in
   --help|-h) usage; exit 0 ;;
+  --monitor) monitor_orchestrators; exit 0 ;;
   --cleanup) cleanup_windows; exit 0 ;;
   -f)
     [ -z "\${2:-}" ] || [ ! -f "$2" ] && { err "File not found: \${2:-<none>}"; exit 1; }

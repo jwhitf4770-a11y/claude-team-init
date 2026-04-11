@@ -49,6 +49,11 @@ Always generate these core agents in `.claude/agents/`:
 - Reports pass/fail counts
 - Caches results if cache is set up
 
+### team-audit.md (opus)
+- Dispatches every agent against the full codebase
+- Collects all findings and synthesizes a ranked recommendations report
+- Writes `TEAM-AUDIT-REPORT.md` with critical/high/medium/low findings + architecture recs
+
 ### orchestrator.md (opus)
 - Takes a problem, generates 3 distinct solution candidates
 - Validates each through build-gate + regression-checker + qa-signoff

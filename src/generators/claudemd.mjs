@@ -78,19 +78,20 @@ function generateAgentSection(audit, agentPlan, cacheConfig) {
   for (const a of sonnet) section += `| Sonnet | \`${a.name}\` | ${a.reason} |\n`;
   for (const a of opus)   section += `| Opus | \`${a.name}\` | ${a.reason} |\n`;
 
+  let step = 1;
   section += `
 **Workflow:**
-1. Code change → \`build-gate\` (validates build)
+${step++}. Code change → \`build-gate\` (validates build)
 `;
 
   if (agentPlan.find(a => a.name === 'api-prober'))
-    section += `2. If API changed → \`api-prober\` (curls endpoints)\n`;
+    section += `${step++}. If API changed → \`api-prober\` (curls endpoints)\n`;
 
   if (agentPlan.find(a => a.name === 'regression-checker'))
-    section += `3. If shared code changed → \`regression-checker\` (runs test suite)\n`;
+    section += `${step++}. If shared code changed → \`regression-checker\` (runs test suite)\n`;
 
-  section += `4. \`qa-signoff\` (final approval with physical proof)
-5. Hand to user ONLY after qa-signoff APPROVED
+  section += `${step++}. \`qa-signoff\` (final approval with physical proof)
+${step++}. Hand to user ONLY after qa-signoff APPROVED
 
 **3-Strike Rule:** If same fix fails 3 times, escalate to orchestrator (Opus).
 `;
