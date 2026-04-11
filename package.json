@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "AI agent team bootstrapper for any codebase. One command to set up specialized agents + Fly.io cache.",
   "bin": {
+    "codecrew": "./bin/cli.mjs",
     "claude-team-init": "./bin/cli.mjs",
     "cti": "./bin/cli.mjs"
   },

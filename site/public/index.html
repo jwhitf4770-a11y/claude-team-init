@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeCrew — Senior Engineering Team for Your AI-Generated Code</title>
+  <meta name="description" content="Stop burning $40/day on repeated builds. One command gives you an AI agent team that caches everything, audits your code, and fixes problems to 95% confidence.">
+  <meta property="og:title" content="CodeCrew — Your Code. Reviewed. Fixed. Shipped.">
+  <meta property="og:description" content="One command. Full AI engineering team. Saves $20-40/day in tokens.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0e17;
+      --surface: #111827;
+      --border: #1e2a3a;
+      --text: #e0e6f0;
+      --muted: #8892a4;
+      --accent: #19d3c5;
+      --accent-hover: #14b8ad;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --purple: #a855f7;
+    }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Nav */
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+    nav a:hover { color: var(--text); }
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-brand { font-weight: 700; color: var(--text); font-size: 16px; }
+    .nav-brand span { color: var(--accent); }
+    .gh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; font-weight: 500; text-decoration: none; }
+    .gh-btn:hover { border-color: var(--accent); }
+
+    /* Hero */
+    .hero { text-align: center; padding: 80px 24px 60px; max-width: 800px; margin: 0 auto; }
+    .hero h1 { font-size: 3.2em; font-weight: 800; line-height: 1.1; margin-bottom: 20px; letter-spacing: -0.02em; }
+    .hero h1 .green { color: var(--accent); }
+    .hero .sub { color: var(--muted); font-size: 1.25em; margin-bottom: 36px; max-width: 600px; margin-left: auto; margin-right: auto; }
+    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; padding: 14px 28px; border-radius: 10px; font-weight: 600; font-size: 15px; text-decoration: none; cursor: pointer; border: none; transition: all 0.15s; }
+    .btn-primary { background: var(--accent); color: var(--bg); }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); }
+
+    /* Install bar */
+    .install { max-width: 520px; margin: 32px auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .install code { color: var(--accent); font-size: 15px; }
+    .install button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 4px 12px; border-radius: 6px; }
+    .install button:hover { background: var(--border); color: var(--text); }
+
+    /* Stats bar */
+    .stats-bar { display: flex; justify-content: center; gap: 48px; padding: 40px 24px; max-width: 800px; margin: 0 auto; }
+    .stat-item { text-align: center; }
+    .stat-num { font-size: 2em; font-weight: 800; color: var(--accent); }
+    .stat-label { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+    /* Terminal demo */
+    .terminal-section { max-width: 700px; margin: 0 auto; padding: 0 24px 60px; }
+    .terminal { background: #0d1117; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .terminal-bar { display: flex; gap: 6px; padding: 12px 16px; background: #161b22; }
+    .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .terminal-dot.red { background: #ff5f57; }
+    .terminal-dot.yellow { background: #febc2e; }
+    .terminal-dot.green { background: #28c840; }
+    .terminal-body { padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.7; color: var(--muted); white-space: pre; overflow-x: auto; }
+    .terminal-body .cmd { color: var(--accent); }
+    .terminal-body .success { color: #28c840; }
+    .terminal-body .warn { color: var(--warning); }
+    .terminal-body .hl { color: var(--text); }
+    .terminal-body .purple { color: var(--purple); }
+
+    /* Sections */
+    .section { padding: 80px 24px; max-width: 1000px; margin: 0 auto; }
+    .section h2 { font-size: 2em; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.01em; }
+    .section .section-sub { color: var(--muted); font-size: 1.1em; margin-bottom: 40px; max-width: 600px; }
+
+    /* Comparison */
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+    .compare-card.bad { border-color: var(--danger); }
+    .compare-card.good { border-color: var(--accent); }
+    .compare-card h3 { font-size: 1em; font-weight: 600; margin-bottom: 16px; }
+    .compare-card.bad h3 { color: var(--danger); }
+    .compare-card.good h3 { color: var(--accent); }
+    .compare-list { list-style: none; }
+    .compare-list li { padding: 6px 0; font-size: 14px; color: var(--muted); }
+    .compare-list li::before { margin-right: 8px; }
+    .compare-card.bad .compare-list li::before { content: '✗'; color: var(--danger); }
+    .compare-card.good .compare-list li::before { content: '✓'; color: var(--accent); }
+
+    /* Features */
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .feature { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+    .feature-icon { font-size: 1.5em; margin-bottom: 12px; }
+    .feature h3 { font-size: 1em; font-weight: 600; margin-bottom: 8px; }
+    .feature p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+    /* Quotes */
+    .quotes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 40px; }
+    .quote { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .quote p { color: var(--muted); font-size: 14px; font-style: italic; margin-bottom: 8px; }
+    .quote .source { color: #555; font-size: 12px; }
+
+    /* Pricing */
+    .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .price-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; text-align: center; }
+    .price-card.featured { border-color: var(--accent); position: relative; }
+    .price-card.featured::before { content: 'MOST POPULAR'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--accent); color: var(--bg); font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+    .price-name { font-size: 1.1em; font-weight: 600; margin-bottom: 8px; }
+    .price-amount { font-size: 2.5em; font-weight: 800; margin-bottom: 4px; }
+    .price-amount span { font-size: 0.4em; color: var(--muted); font-weight: 400; }
+    .price-desc { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+    .price-features { list-style: none; text-align: left; margin-bottom: 24px; }
+    .price-features li { padding: 6px 0; font-size: 14px; color: var(--muted); }
+    .price-features li::before { content: '✓'; color: var(--accent); margin-right: 8px; }
+    .price-btn { display: block; width: 100%; padding: 12px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; text-decoration: none; text-align: center; }
+    .price-btn.free { background: var(--border); color: var(--text); }
+    .price-btn.free:hover { background: #2a3a4a; }
+    .price-btn.pro { background: var(--accent); color: var(--bg); }
+    .price-btn.pro:hover { background: var(--accent-hover); }
+    .price-btn.team { background: var(--surface); color: var(--accent); border: 1px solid var(--accent); }
+    .price-btn.team:hover { background: #0d2a28; }
+
+    /* Slash commands */
+    .commands { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 32px; }
+    .command { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .command code { color: var(--accent); font-size: 15px; font-weight: 500; }
+    .command p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+    /* CTA */
+    .final-cta { text-align: center; padding: 80px 24px; }
+    .final-cta h2 { font-size: 2.2em; font-weight: 800; margin-bottom: 16px; }
+    .final-cta p { color: var(--muted); font-size: 1.1em; margin-bottom: 32px; }
+
+    /* Footer */
+    footer { text-align: center; padding: 40px 24px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2em; }
+      .stats-bar { flex-direction: column; gap: 16px; }
+      .compare-grid, .features, .pricing, .quotes, .commands { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">Code<span>Crew</span></div>
+  <div class="nav-links">
+    <a href="#how">How It Works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="https://github.com/jwhitf4770-a11y/CodeCrew" class="gh-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <h1>Stop burning tokens.<br><span class="green">Ship better code.</span></h1>
+  <p class="sub">One command gives your AI-generated codebase a full senior engineering team. Saves $20-40/day in tokens. Finds and fixes every problem.</p>
+  <div class="hero-cta">
+    <a href="#install" class="btn btn-primary">Get Started Free</a>
+    <a href="#how" class="btn btn-secondary">See How It Works</a>
+  </div>
+  <div class="install" id="install">
+    <code>npx codecrew</code>
+    <button onclick="navigator.clipboard.writeText('npx codecrew');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-num">4.3M</div>
+    <div class="stat-label">Tokens saved in 2 days</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">$40</div>
+    <div class="stat-label">Saved per day (heavy use)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">$3</div>
+    <div class="stat-label">Cache server per month</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">95%</div>
+    <div class="stat-label">Fix confidence target</div>
+  </div>
+</div>
+
+<!-- Terminal Demo -->
+<div class="terminal-section">
+  <div class="terminal">
+    <div class="terminal-bar">
+      <div class="terminal-dot red"></div>
+      <div class="terminal-dot yellow"></div>
+      <div class="terminal-dot green"></div>
+    </div>
+    <div class="terminal-body"><span class="cmd">$ npx codecrew</span>
+
+<span class="success">✔</span> Found: <span class="hl">Next.js</span> project
+
+  Detected:
+    Framework:    <span class="success">Next.js</span>
+    Database:     <span class="success">Supabase</span>
+    Auth:         <span class="success">Supabase Auth</span>
+    Payments:     <span class="success">Stripe</span>
+    API routes:   <span class="success">yes</span>
+
+  Agents:
+    build-gate          <span class="warn">haiku</span>   Build verification
+    qa-signoff          <span class="warn">haiku</span>   Final QA gate
+    regression-checker  <span class="warn">haiku</span>   Side effect detection
+    orchestrator        <span class="purple">opus</span>    3-solution finder
+    team-audit          <span class="purple">opus</span>    Code audit + auto-fix
+    security-reviewer   <span class="hl">sonnet</span>  DB security audit
+    auth-verifier       <span class="hl">sonnet</span>  Auth flow validation
+
+<span class="success">✔</span> Agent team generated!
+<span class="success">✔</span> Cache server deployed!
+<span class="success">✔</span> Agent hooks configured!
+
+  Inside Claude Code, just type:
+    <span class="cmd">/team-audit</span>       Audit + fix your entire codebase
+    <span class="cmd">/team-review</span>      Quick agent team fitness check
+    <span class="cmd">/team-launch</span>      Parallel orchestrator mode</div>
+  </div>
+</div>
+
+<!-- The Problem -->
+<section class="section">
+  <h2>You vibe coded your app. Now what?</h2>
+  <p class="section-sub">Reddit knows the feeling. Here's what developers are saying:</p>
+
+  <div class="quotes">
+    <div class="quote">
+      <p>"I have this constant low-grade anxiety that somewhere in the codebase there's a function that's one wrong input away from catastrophic failure."</p>
+      <div class="source">r/vibecoding</div>
+    </div>
+    <div class="quote">
+      <p>"Built my SaaS in 3 days. Last week I sat down to add one small feature. One day gone. 30k lines I can't navigate."</p>
+      <div class="source">r/startups</div>
+    </div>
+    <div class="quote">
+      <p>"Each fix introduces two new problems because the LLM has no memory of why it made those architectural decisions."</p>
+      <div class="source">r/vibecoding — 572 upvotes</div>
+    </div>
+    <div class="quote">
+      <p>"If you've vibe coded Supabase Row Level Security and it actually works, you're lying."</p>
+      <div class="source">r/vibecoding</div>
+    </div>
+  </div>
+</section>
+
+<!-- Comparison -->
+<section class="section">
+  <h2>What linters catch vs. what we catch</h2>
+  <p class="section-sub">ESLint is spell-check. This is an editorial board.</p>
+  <div class="compare-grid">
+    <div class="compare-card bad">
+      <h3>What linters find</h3>
+      <ul class="compare-list">
+        <li>Unused variable</li>
+        <li>Missing semicolon</li>
+        <li>Wrong indentation</li>
+        <li>Import order</li>
+        <li>Trailing whitespace</li>
+        <li>Inconsistent quotes</li>
+      </ul>
+    </div>
+    <div class="compare-card good">
+      <h3>What /team-audit finds (and fixes)</h3>
+      <ul class="compare-list">
+        <li>3 API routes with zero auth</li>
+        <li>SQL injection in search endpoint</li>
+        <li>2,400 lines of dead code</li>
+        <li>Duplicated fetch logic in 8 files</li>
+        <li>God component with 847 lines</li>
+        <li>Missing error boundaries everywhere</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section" id="how">
+  <h2>How it works</h2>
+  <p class="section-sub">Three steps. Five minutes. Zero config.</p>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">1</div>
+      <h3>Scan</h3>
+      <p>Detects your language, framework, database, auth, payments, storage, mobile — everything. Works with Next.js, Python, Go, Rust, Swift, and 15+ stacks.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">2</div>
+      <h3>Generate</h3>
+      <p>Creates specialized AI agents tailored to YOUR stack. Build gate, QA signoff, security reviewer, orchestrator — each knows your tools.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">3</div>
+      <h3>Audit + Fix</h3>
+      <p>Sends the team through your codebase. Finds dead code, security holes, bad patterns. Fixes everything to 95% confidence. Writes a report.</p>
+    </div>
+  </div>
+
+  <div class="commands">
+    <div class="command">
+      <code>/team-audit</code>
+      <p>Full codebase scan. Finds every problem. Fixes them all. Validates the build. 95% confidence.</p>
+    </div>
+    <div class="command">
+      <code>/team-review</code>
+      <p>Quick check — are your agents right for this codebase? Coverage gaps? Wrong tiers?</p>
+    </div>
+    <div class="command">
+      <code>/team-launch</code>
+      <p>Give it multiple problems. Each gets its own orchestrator with 3 solutions. Wake up to fixes.</p>
+    </div>
+    <div class="command">
+      <code>/team-init</code>
+      <p>Re-run setup. Regenerate agents after your codebase evolves.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Token Savings -->
+<section class="section">
+  <h2>The math on token savings</h2>
+  <p class="section-sub">Your agents repeat each other's work. The cache fixes that.</p>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <div class="terminal-dot red"></div>
+      <div class="terminal-dot yellow"></div>
+      <div class="terminal-dot green"></div>
+    </div>
+    <div class="terminal-body"><span class="hl">Without cache:</span>
+  build-gate runs  → npm run build (1 min)  → 24KB output
+  qa-signoff runs  → npm run build (1 min)  → 24KB output  <span class="warn">← DUPLICATE</span>
+  regression runs  → npm run build (1 min)  → 24KB output  <span class="warn">← DUPLICATE</span>
+
+<span class="hl">With cache ($3/month):</span>
+  build-gate runs  → npm run build (1 min)  → Caches 250-byte summary
+  qa-signoff runs  → Reads cache (instant)  → 250 bytes    <span class="success">← SAVED</span>
+  regression runs  → Reads cache (instant)  → 250 bytes    <span class="success">← SAVED</span>
+
+  <span class="success">Tokens saved per cycle: 33,750 (~99.3%)</span>
+  <span class="success">Daily savings (heavy use): $20-40</span>
+  <span class="success">Monthly savings: $600-1,200</span></div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="section" id="pricing">
+  <h2>Pricing</h2>
+  <p class="section-sub">The tool is free. The cache pays for itself in an hour.</p>
+
+  <div class="pricing">
+    <div class="price-card">
+      <div class="price-name">Free</div>
+      <div class="price-amount">$0</div>
+      <div class="price-desc">Everything you need to start</div>
+      <ul class="price-features">
+        <li>Full agent team generation</li>
+        <li>/team-audit, /team-review</li>
+        <li>Orchestrator with 3-solution finder</li>
+        <li>Auto-trigger hooks</li>
+        <li>Unlimited agents</li>
+      </ul>
+      <a href="#install" class="price-btn free">Install Free</a>
+    </div>
+
+    <div class="price-card featured">
+      <div class="price-name">Pro Cache</div>
+      <div class="price-amount">$9<span>/month</span></div>
+      <div class="price-desc">Managed cache + dashboard</div>
+      <ul class="price-features">
+        <li>Everything in Free</li>
+        <li>Managed Fly.io cache server</li>
+        <li>Token savings dashboard</li>
+        <li>1,000 cache keys</li>
+        <li>24-hour TTL</li>
+        <li>Priority support</li>
+      </ul>
+      <button class="price-btn pro" onclick="checkout('pro')">Start Pro</button>
+    </div>
+
+    <div class="price-card">
+      <div class="price-name">Team</div>
+      <div class="price-amount">$29<span>/month</span></div>
+      <div class="price-desc">For teams shipping daily</div>
+      <ul class="price-features">
+        <li>Everything in Pro</li>
+        <li>5,000 cache keys</li>
+        <li>48-hour TTL</li>
+        <li>Shared agent configs across repos</li>
+        <li>Team savings analytics</li>
+        <li>Slack integration</li>
+      </ul>
+      <button class="price-btn team" onclick="checkout('team')">Start Team</button>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<section class="final-cta">
+  <h2>Your code deserves a senior engineering team.</h2>
+  <p>One command. Zero config. Start in 30 seconds.</p>
+  <div class="install" style="margin: 0 auto;">
+    <code>npx codecrew</code>
+    <button onclick="navigator.clipboard.writeText('npx codecrew');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
+  </div>
+</section>
+
+<footer>
+  <p>
+    <a href="https://github.com/jwhitf4770-a11y/CodeCrew">GitHub</a> &middot;
+    MIT License &middot;
+    Built by someone who burns tokens too
+  </p>
+</footer>
+
+<script>
+async function checkout(plan) {
+  try {
+    const res = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan }),
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+    else alert(data.error || 'Something went wrong');
+  } catch (e) {
+    alert('Checkout unavailable — install the free tier to get started.');
+  }
+}
+
+// Handle upgrade success
+const params = new URLSearchParams(window.location.search);
+if (params.get('upgraded')) {
+  alert('Welcome to ' + params.get('upgraded').charAt(0).toUpperCase() + params.get('upgraded').slice(1) + '! Check your email for setup instructions.');
+  window.history.replaceState({}, '', '/');
+}
+</script>
+
+</body>
+</html>

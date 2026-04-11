@@ -37,8 +37,8 @@ async function main() {
   const projectDir = resolve(positionalArgs[0] || '.');
 
   console.log('');
-  console.log(chalk.bold.cyan('  claude-team-init'));
-  console.log(chalk.gray('  AI agent team bootstrapper'));
+  console.log(chalk.bold.cyan('  CodeCrew'));
+  console.log(chalk.gray('  Senior engineering team for your AI-generated code'));
   console.log('');
 
   // Step 1: Audit
@@ -263,13 +263,13 @@ function buildAgentPlan(audit) {
 
 function printHelp() {
   console.log(`
-${chalk.bold('claude-team-init')} — Senior engineering team for your AI-generated code
+${chalk.bold('CodeCrew')} — Senior engineering team for your AI-generated code
 
 ${chalk.bold('Usage:')}
-  claude-team-init                 Set up in current directory
-  claude-team-init ~/my-project    Set up in another directory
-  claude-team-init -y              Accept all defaults (fewest keystrokes)
-  claude-team-init -y --no-cache   Skip Fly.io, just generate agents
+  codecrew                     Set up in current directory
+  codecrew ~/my-project        Set up in another directory
+  codecrew -y                  Accept all defaults (fewest keystrokes)
+  codecrew -y --no-cache       Skip Fly.io, just generate agents
 
 ${chalk.bold('Options:')}
   -y, --yes       Accept all defaults — no prompts
