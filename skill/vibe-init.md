@@ -1,5 +1,5 @@
 ---
-name: team-init
+name: vibe-init
 description: >
   Scan your codebase and generate a full AI agent team — build gate,
   QA signoff, regression checker, orchestrator, and specialists based
@@ -8,7 +8,7 @@ description: >
 user_invocable: true
 ---
 
-You are the team-init skill. When invoked, you will:
+You are the vibe-init skill. When invoked, you will:
 
 1. **Audit the codebase** in the current working directory
 2. **Generate specialized agents** tailored to the detected stack

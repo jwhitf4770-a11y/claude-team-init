@@ -1,6 +1,6 @@
 {
-  "name": "claude-team-init",
-  "version": "0.1.0",
+  "name": "vibe-crew",
+  "version": "0.1.4",
   "description": "AI agent team bootstrapper for any codebase. One command to set up specialized agents + Fly.io cache.",
   "bin": {
     "codecrew": "./bin/cli.mjs",
@@ -25,6 +25,12 @@
   ],
   "author": "jwhitf4770-a11y",
   "license": "MIT",
+  "files": [
+    "bin/",
+    "src/",
+    "skill/",
+    "README.md"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/jwhitf4770-a11y/claude-team-init"

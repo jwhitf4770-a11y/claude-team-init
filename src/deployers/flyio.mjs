@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
 
-export async function deployFlyio(projectDir, audit) {
+export async function deployFlyio(projectDir, audit, { yesAll = false } = {}) {
   const projectName = projectDir.split('/').pop().toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const appName = `${projectName}-agent-cache`;
   const token = randomBytes(24).toString('hex');
@@ -22,6 +22,23 @@ export async function deployFlyio(projectDir, audit) {
   try {
     execSync('flyctl version', { stdio: 'pipe' });
   } catch {
+    if (yesAll) {
+      console.log('');
+      console.log(chalk.yellow('  ⚠ flyctl not found — cache server requires Fly.io CLI.'));
+      console.log('');
+      console.log(chalk.bold('  Option 1: Install Fly.io and get the cache (recommended)'));
+      console.log(chalk.cyan('    brew install flyctl'));
+      console.log(chalk.cyan('    fly auth login'));
+      console.log(chalk.cyan('    npx vibe-crew -y'));
+      console.log('');
+      console.log(chalk.bold('  Option 2: Skip the cache'));
+      console.log(chalk.cyan('    npx vibe-crew -y --no-cache'));
+      console.log('');
+      console.log(chalk.gray('  Without the cache (~$3/mo), agents repeat each other\'s work.'));
+      console.log(chalk.gray('  Typical waste: $15-40/day in duplicate API calls.'));
+      console.log('');
+      process.exit(1);
+    }
     console.log(chalk.yellow('  flyctl not installed. Install it first:'));
     console.log('');
     console.log(chalk.cyan('    brew install flyctl'));
@@ -45,6 +62,22 @@ export async function deployFlyio(projectDir, audit) {
   try {
     execSync('flyctl auth whoami', { stdio: 'pipe' });
   } catch {
+    if (yesAll) {
+      console.log('');
+      console.log(chalk.yellow('  ⚠ Not logged in to Fly.io.'));
+      console.log('');
+      console.log(chalk.bold('  Option 1: Log in and get the cache (recommended)'));
+      console.log(chalk.cyan('    fly auth login'));
+      console.log(chalk.cyan('    npx vibe-crew -y'));
+      console.log('');
+      console.log(chalk.bold('  Option 2: Skip the cache'));
+      console.log(chalk.cyan('    npx vibe-crew -y --no-cache'));
+      console.log('');
+      console.log(chalk.gray('  Without the cache (~$3/mo), agents repeat each other\'s work.'));
+      console.log(chalk.gray('  Typical waste: $15-40/day in duplicate API calls.'));
+      console.log('');
+      process.exit(1);
+    }
     console.log(chalk.yellow('  Not logged in to Fly.io. Run:'));
     console.log(chalk.cyan('    fly auth login'));
 
@@ -117,12 +150,16 @@ primary_region = "ord"
   }
 
   // Deploy
-  const { deploy } = await inquirer.prompt([{
-    type: 'confirm',
-    name: 'deploy',
-    message: `Deploy cache server as "${appName}" on Fly.io?`,
-    default: true,
-  }]);
+  let deploy = true;
+  if (!yesAll) {
+    const answer = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'deploy',
+      message: `Deploy cache server as "${appName}" on Fly.io?`,
+      default: true,
+    }]);
+    deploy = answer.deploy;
+  }
 
   if (!deploy) {
     console.log(chalk.gray(`  Server files saved to ${serverDir}`));

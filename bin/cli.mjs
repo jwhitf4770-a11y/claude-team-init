@@ -125,7 +125,7 @@ async function main() {
         cacheConfig = await deployFlyio(projectDir, audit);
       }
     } else {
-      cacheConfig = await deployFlyio(projectDir, audit);
+      cacheConfig = await deployFlyio(projectDir, audit, { yesAll });
     }
   } else {
     console.log(chalk.gray('  Skipping Fly.io cache (--no-cache)'));
@@ -158,27 +158,18 @@ async function main() {
   console.log('');
   console.log(chalk.bold.green('  Setup complete!'));
   console.log('');
-  console.log(chalk.bold('  Inside Claude Code, just type:'));
-  console.log(`    ${chalk.cyan('/team-audit')}       Audit + fix your entire codebase`);
-  console.log(`    ${chalk.cyan('/team-review')}      Quick agent team fitness check`);
-  console.log(`    ${chalk.cyan('/team-launch')}      Parallel orchestrator mode`);
-  console.log(`    ${chalk.cyan('/team-init')}        Re-run this setup`);
-  console.log('');
-  console.log(chalk.bold('  Files created:'));
-  console.log(`    ${chalk.gray('.claude/agents/')}        ${agentPlan.length} agent definitions`);
-  console.log(`    ${chalk.gray('.claude/settings.local.json')}  Permissions + hooks`);
-  console.log(`    ${chalk.gray('.claude/rules.json')}     Agent trigger rules`);
-  console.log(`    ${chalk.gray('scripts/team-launch.sh')}  Parallel orchestrator launcher`);
+  console.log(chalk.bold('  What happens now:'));
+  console.log(chalk.green('    ✔ Agents guard you automatically on every edit and commit'));
+  console.log(chalk.green(`    ✔ ${agentPlan.length} agents configured for your stack`));
   if (cacheConfig) {
-    console.log(`    ${chalk.gray('scripts/cache-hook.sh')} Fly.io cache integration`);
+    console.log(chalk.green(`    ✔ Cache server live: ${cacheConfig.url}`));
   }
-  console.log(`    ${chalk.gray('CLAUDE.md')}              Agent workflow rules`);
   console.log('');
-  if (cacheConfig) {
-    console.log(chalk.gray(`  Cache server: ${cacheConfig.url}`));
-    console.log(chalk.gray(`  Estimated savings: $20-40/day on heavy usage`));
-    console.log('');
-  }
+  console.log(chalk.bold('  Commands (inside Claude Code):'));
+  console.log(`    ${chalk.cyan('/vibe-audit')}     Code feels messy? Finds + fixes issues to 95%`);
+  console.log(`    ${chalk.cyan('/vibe-launch')}    Hard problem? 3 solutions, picks the best`);
+  console.log(`    ${chalk.cyan('/vibe-crew')}      Show all commands + workflow guide`);
+  console.log('');
 
   // Step 6: Run audit (skip with --no-audit)
   let runAudit = !skipAudit;
@@ -280,10 +271,11 @@ ${chalk.bold('Options:')}
   --dry-run       Preview without writing files
 
 ${chalk.bold('After setup, inside Claude Code:')}
-  /team-audit     Audit + fix your entire codebase
-  /team-review    Quick agent team fitness check
-  /team-launch    Parallel orchestrator mode
-  /team-init      Re-run setup
+  /vibe-audit     Audit + fix your entire codebase
+  /vibe-review    Quick agent team fitness check
+  /vibe-launch    Parallel orchestrator mode
+  /vibe-init      Re-run setup
+  /vibe-crew      Show all commands
 
 ${chalk.bold('Learn more:')} https://github.com/jwhitf4770-a11y/claude-team-init
 `);
