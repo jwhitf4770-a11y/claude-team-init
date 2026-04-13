@@ -1,6 +1,6 @@
 {
   "name": "vibe-crew",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "AI agent team bootstrapper for any codebase. One command to set up specialized agents + Fly.io cache.",
   "bin": {
     "codecrew": "./bin/cli.mjs",
@@ -40,8 +40,11 @@
   },
   "dependencies": {
     "chalk": "^5.3.0",
+    "glob": "^10.3.0",
     "inquirer": "^9.2.0",
-    "ora": "^7.0.1",
-    "glob": "^10.3.0"
+    "ora": "^7.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
   }
 }
