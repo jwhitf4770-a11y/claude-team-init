@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CodeCrew — Senior Engineering Team for Your AI-Generated Code</title>
+  <title>vibe-crew — Senior Engineering Team for Your AI-Generated Code</title>
   <meta name="description" content="Stop burning $40/day on repeated builds. One command gives you an AI agent team that caches everything, audits your code, and fixes problems to 95% confidence.">
-  <meta property="og:title" content="CodeCrew — Your Code. Reviewed. Fixed. Shipped.">
+  <meta property="og:title" content="vibe-crew — Your Code. Reviewed. Fixed. Shipped.">
   <meta property="og:description" content="One command. Full AI engineering team. Saves $20-40/day in tokens.">
   <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -92,8 +92,8 @@
     .compare-list { list-style: none; }
     .compare-list li { padding: 6px 0; font-size: 14px; color: var(--muted); }
     .compare-list li::before { margin-right: 8px; }
-    .compare-card.bad .compare-list li::before { content: '✗'; color: var(--danger); }
-    .compare-card.good .compare-list li::before { content: '✓'; color: var(--accent); }
+    .compare-card.bad .compare-list li::before { content: '\2717'; color: var(--danger); }
+    .compare-card.good .compare-list li::before { content: '\2713'; color: var(--accent); }
 
     /* Features */
     .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
@@ -119,7 +119,7 @@
     .price-desc { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
     .price-features { list-style: none; text-align: left; margin-bottom: 24px; }
     .price-features li { padding: 6px 0; font-size: 14px; color: var(--muted); }
-    .price-features li::before { content: '✓'; color: var(--accent); margin-right: 8px; }
+    .price-features li::before { content: '\2713'; color: var(--accent); margin-right: 8px; }
     .price-btn { display: block; width: 100%; padding: 12px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; text-decoration: none; text-align: center; }
     .price-btn.free { background: var(--border); color: var(--text); }
     .price-btn.free:hover { background: #2a3a4a; }
@@ -134,6 +134,39 @@
     .command code { color: var(--accent); font-size: 15px; font-weight: 500; }
     .command p { color: var(--muted); font-size: 13px; margin-top: 6px; }
 
+    /* Guide section */
+    .guide { max-width: 800px; margin: 0 auto; }
+    .guide-step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-bottom: 20px; position: relative; }
+    .guide-step .step-num { position: absolute; top: -14px; left: 24px; background: var(--accent); color: var(--bg); font-weight: 800; font-size: 13px; padding: 4px 14px; border-radius: 20px; }
+    .guide-step h3 { font-size: 1.15em; font-weight: 700; margin-bottom: 12px; padding-top: 4px; }
+    .guide-step p { color: var(--muted); font-size: 14px; margin-bottom: 12px; line-height: 1.6; }
+    .guide-step .code-block { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); margin: 12px 0; overflow-x: auto; white-space: pre; }
+    .guide-step .code-block .comment { color: var(--muted); }
+    .guide-step .code-block .output { color: #28c840; }
+    .guide-step .note { background: #1a1f2e; border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 0 8px 8px 0; margin-top: 12px; }
+    .guide-step .note p { margin: 0; font-size: 13px; }
+    .guide-step .warn-note { background: #1f1a0e; border-left: 3px solid var(--warning); padding: 12px 16px; border-radius: 0 8px 8px 0; margin-top: 12px; }
+    .guide-step .warn-note p { margin: 0; font-size: 13px; color: var(--warning); }
+
+    /* FAQ */
+    .faq-list { max-width: 800px; margin: 0 auto; }
+    .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+    .faq-q { padding: 20px 24px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 15px; }
+    .faq-q:hover { background: #151d2e; }
+    .faq-q::after { content: '+'; font-size: 20px; color: var(--accent); font-weight: 300; transition: transform 0.2s; }
+    .faq-item.open .faq-q::after { transform: rotate(45deg); }
+    .faq-a { display: none; padding: 0 24px 20px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .faq-a code { background: #0d1117; padding: 2px 8px; border-radius: 4px; font-size: 13px; color: var(--accent); }
+    .faq-item.open .faq-a { display: block; }
+
+    /* Prereqs grid */
+    .prereqs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 20px; }
+    .prereq { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .prereq h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .prereq p { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .prereq code { font-size: 12px; color: var(--accent); }
+    .prereq .check-cmd { background: #0d1117; padding: 8px 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 8px; }
+
     /* CTA */
     .final-cta { text-align: center; padding: 80px 24px; }
     .final-cta h2 { font-size: 2.2em; font-weight: 800; margin-bottom: 16px; }
@@ -143,22 +176,27 @@
     footer { text-align: center; padding: 40px 24px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
     footer a { color: var(--accent); text-decoration: none; }
 
+    /* Smooth scroll */
+    html { scroll-behavior: smooth; }
+
     /* Responsive */
     @media (max-width: 768px) {
       .hero h1 { font-size: 2em; }
       .stats-bar { flex-direction: column; gap: 16px; }
-      .compare-grid, .features, .pricing, .quotes, .commands { grid-template-columns: 1fr; }
+      .compare-grid, .features, .pricing, .quotes, .commands, .prereqs { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
 <nav>
-  <div class="nav-brand">Code<span>Crew</span></div>
+  <div class="nav-brand">vibe-<span>crew</span></div>
   <div class="nav-links">
+    <a href="#guide">Get Started</a>
     <a href="#how">How It Works</a>
     <a href="#pricing">Pricing</a>
-    <a href="https://github.com/jwhitf4770-a11y/CodeCrew" class="gh-btn">
+    <a href="#faq">Help</a>
+    <a href="https://github.com/jwhitf4770-a11y/claude-team-init" class="gh-btn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
       GitHub
     </a>
@@ -170,12 +208,12 @@
   <h1>Stop burning tokens.<br><span class="green">Ship better code.</span></h1>
   <p class="sub">One command gives your AI-generated codebase a full senior engineering team. Saves $20-40/day in tokens. Finds and fixes every problem.</p>
   <div class="hero-cta">
-    <a href="#install" class="btn btn-primary">Get Started Free</a>
+    <a href="#guide" class="btn btn-primary">Get Started</a>
     <a href="#how" class="btn btn-secondary">See How It Works</a>
   </div>
   <div class="install" id="install">
-    <code>npx codecrew</code>
-    <button onclick="navigator.clipboard.writeText('npx codecrew');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
+    <code>npx vibe-crew</code>
+    <button onclick="navigator.clipboard.writeText('npx vibe-crew');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
   </div>
 </section>
 
@@ -207,9 +245,11 @@
       <div class="terminal-dot yellow"></div>
       <div class="terminal-dot green"></div>
     </div>
-    <div class="terminal-body"><span class="cmd">$ npx codecrew</span>
+    <div class="terminal-body"><span class="cmd">$ npx vibe-crew --key ABCD-EF12-GH34-IJ56</span>
 
-<span class="success">✔</span> Found: <span class="hl">Next.js</span> project
+<span class="success">&#10004;</span> License: <span class="hl">starter plan</span>
+
+<span class="success">&#10004;</span> Found: <span class="hl">Next.js</span> project
 
   Detected:
     Framework:    <span class="success">Next.js</span>
@@ -223,20 +263,200 @@
     qa-signoff          <span class="warn">haiku</span>   Final QA gate
     regression-checker  <span class="warn">haiku</span>   Side effect detection
     orchestrator        <span class="purple">opus</span>    3-solution finder
-    team-audit          <span class="purple">opus</span>    Code audit + auto-fix
+    vibe-audit          <span class="purple">opus</span>    Code audit + auto-fix
     security-reviewer   <span class="hl">sonnet</span>  DB security audit
     auth-verifier       <span class="hl">sonnet</span>  Auth flow validation
 
-<span class="success">✔</span> Agent team generated!
-<span class="success">✔</span> Cache server deployed!
-<span class="success">✔</span> Agent hooks configured!
+<span class="success">&#10004;</span> Agent team generated!
+<span class="success">&#10004;</span> Agent hooks configured!
 
   Inside Claude Code, just type:
-    <span class="cmd">/team-audit</span>       Audit + fix your entire codebase
-    <span class="cmd">/team-review</span>      Quick agent team fitness check
-    <span class="cmd">/team-launch</span>      Parallel orchestrator mode</div>
+    <span class="cmd">/vibe-audit</span>       Audit + fix your entire codebase
+    <span class="cmd">/vibe-review</span>      Quick agent team fitness check
+    <span class="cmd">/vibe-launch</span>      Parallel orchestrator mode
+    <span class="cmd">/vibe-crew</span>        Show all available commands</div>
   </div>
 </div>
+
+
+<!-- ==================== GETTING STARTED GUIDE ==================== -->
+<section class="section" id="guide">
+  <h2>Getting Started Guide</h2>
+  <p class="section-sub">From zero to a fully audited codebase in under 5 minutes. Follow every step below.</p>
+
+  <div class="guide">
+
+    <!-- Prerequisites -->
+    <div class="guide-step">
+      <div class="step-num">PREREQUISITES</div>
+      <h3>What you need before you start</h3>
+      <p>vibe-crew works inside <strong>Claude Code</strong> (Anthropic's CLI for Claude). Make sure you have these installed:</p>
+
+      <div class="prereqs">
+        <div class="prereq">
+          <h4>Node.js 18+</h4>
+          <p>Required to run npx and the CLI</p>
+          <div class="check-cmd">$ node --version<br>v22.0.0</div>
+        </div>
+        <div class="prereq">
+          <h4>Claude Code</h4>
+          <p>The AI coding CLI from Anthropic</p>
+          <div class="check-cmd">$ npm install -g @anthropic-ai/claude-code<br>$ claude</div>
+        </div>
+        <div class="prereq">
+          <h4>A codebase</h4>
+          <p>Any project with code in it. We detect 15+ stacks automatically.</p>
+          <div class="check-cmd">$ cd ~/my-project</div>
+        </div>
+        <div class="prereq">
+          <h4>Anthropic API key</h4>
+          <p>Claude Code needs this to run agents. Set it in your environment.</p>
+          <div class="check-cmd">$ export ANTHROPIC_API_KEY=sk-ant-...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="guide-step">
+      <div class="step-num">STEP 1</div>
+      <h3>Get your license key</h3>
+      <p>Pick a plan below and complete checkout. Your license key will be emailed to you immediately. It looks like this:</p>
+      <div class="code-block">ABCD-EF12-GH34-IJ56</div>
+      <p>Check your inbox (and spam folder) for an email from <strong>noreply@picvaultpro.com</strong> with the subject "Your CodeCrew license key".</p>
+      <div class="note">
+        <p><strong>Want to preview first?</strong> Run <code>npx vibe-crew --dry-run</code> to see what agents would be generated for your project, without needing a license key.</p>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="guide-step">
+      <div class="step-num">STEP 2</div>
+      <h3>Activate your license</h3>
+      <p>Open your terminal, navigate to your project directory, and run:</p>
+      <div class="code-block">$ cd ~/your-project
+$ npx vibe-crew --key ABCD-EF12-GH34-IJ56</div>
+      <p>This does three things at once:</p>
+      <p>1. <strong>Saves your license</strong> to <code>~/.vibe-crew/license</code> so you never need to enter it again<br>
+         2. <strong>Scans your codebase</strong> to detect your framework, database, auth, payments, and more<br>
+         3. <strong>Generates your agent team</strong> with specialized agents tailored to your exact stack</p>
+      <div class="note">
+        <p><strong>Your key works on all your projects.</strong> Once activated, just run <code>npx vibe-crew</code> (no --key flag) in any new project. The license is stored globally.</p>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="guide-step">
+      <div class="step-num">STEP 3</div>
+      <h3>Watch it scan and generate</h3>
+      <p>The CLI will output everything it finds and creates. Here's what a typical run looks like:</p>
+      <div class="code-block"><span class="comment"># It scans your codebase first</span>
+<span class="output">&#10004;</span> Found: Next.js project
+
+  Detected:
+    Framework:    Next.js
+    Database:     Supabase
+    Auth:         Supabase Auth
+    Payments:     Stripe
+    API routes:   14 routes
+    Components:   47 files
+    Tests:        3 test files
+
+<span class="comment"># Then generates agents matched to your stack</span>
+  Agents to generate:
+    build-gate          haiku    Build + lint verification
+    qa-signoff          haiku    Final QA with physical proof
+    regression-checker  haiku    Side effect detection
+    orchestrator        opus     3-solution finder (97% confidence)
+    security-reviewer   sonnet   Supabase RLS + auth audit
+    api-prober          haiku    API endpoint testing
+
+<span class="comment"># Then sets up hooks so agents run automatically</span>
+<span class="output">&#10004;</span> Agent team generated!
+<span class="output">&#10004;</span> Agent hooks configured!
+<span class="output">&#10004;</span> Slash commands installed!</div>
+      <p>The generated files go into your project's <code>.claude/</code> directory:</p>
+      <div class="code-block">.claude/
+  agents/             <span class="comment"># Agent definitions</span>
+    build-gate.md
+    qa-signoff.md
+    regression-checker.md
+    orchestrator.md
+    security-reviewer.md
+    ...
+  settings.json       <span class="comment"># Auto-trigger rules</span>
+  CLAUDE.md           <span class="comment"># Project instructions</span></div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="guide-step">
+      <div class="step-num">STEP 4</div>
+      <h3>Open Claude Code and use your commands</h3>
+      <p>Start Claude Code in your project directory. Your new slash commands are ready immediately:</p>
+      <div class="code-block">$ claude
+
+<span class="comment"># Now inside Claude Code, type any of these:</span>
+
+<span class="cmd">/vibe-audit</span>
+  Full codebase audit. Finds security holes, dead code,
+  bad patterns, missing error handling. Fixes everything
+  to 95% confidence. Generates a report.
+
+<span class="cmd">/vibe-review</span>
+  Quick check: are your agents right for this codebase?
+  Finds coverage gaps. Suggests new agents if your
+  stack has changed.
+
+<span class="cmd">/vibe-launch</span>
+  Give it a list of problems. Each gets its own
+  orchestrator with 3 competing solutions. Picks the
+  best one automatically.
+
+<span class="cmd">/vibe-init</span>
+  Re-run the setup. Use this after adding a major
+  new dependency or changing your stack.
+
+<span class="cmd">/vibe-crew</span>
+  Show all available commands and your current
+  agent team status.</div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="guide-step">
+      <div class="step-num">STEP 5</div>
+      <h3>Run your first audit</h3>
+      <p>This is where the magic happens. Inside Claude Code, type:</p>
+      <div class="code-block"><span class="cmd">/vibe-audit</span></div>
+      <p>The audit team will:</p>
+      <p>1. <strong>Scan</strong> every file in your project for issues<br>
+         2. <strong>Categorize</strong> findings: security, performance, dead code, patterns, architecture<br>
+         3. <strong>Fix</strong> each issue automatically with the appropriate agent<br>
+         4. <strong>Validate</strong> every fix passes build + tests via the build-gate agent<br>
+         5. <strong>Report</strong> a summary of everything found and fixed</p>
+      <div class="warn-note">
+        <p><strong>First audit can take 5-15 minutes</strong> depending on codebase size. Subsequent runs are much faster thanks to caching.</p>
+      </div>
+    </div>
+
+    <!-- Auto-triggers -->
+    <div class="guide-step">
+      <div class="step-num">AUTOMATIC</div>
+      <h3>Agents run automatically too</h3>
+      <p>vibe-crew configures hooks so certain agents trigger without you doing anything:</p>
+      <div class="code-block"><span class="comment"># When you edit a file:</span>
+  build-gate runs automatically to verify the build
+
+<span class="comment"># When you commit:</span>
+  qa-signoff verifies changes before the commit lands
+  regression-checker scans for side effects
+
+<span class="comment"># When you push:</span>
+  The full agent team validates the branch</div>
+      <p>You can customize which agents auto-trigger by editing <code>.claude/settings.json</code> in your project.</p>
+    </div>
+
+  </div>
+</section>
+
 
 <!-- The Problem -->
 <section class="section">
@@ -254,7 +474,7 @@
     </div>
     <div class="quote">
       <p>"Each fix introduces two new problems because the LLM has no memory of why it made those architectural decisions."</p>
-      <div class="source">r/vibecoding — 572 upvotes</div>
+      <div class="source">r/vibecoding &mdash; 572 upvotes</div>
     </div>
     <div class="quote">
       <p>"If you've vibe coded Supabase Row Level Security and it actually works, you're lying."</p>
@@ -280,7 +500,7 @@
       </ul>
     </div>
     <div class="compare-card good">
-      <h3>What /team-audit finds (and fixes)</h3>
+      <h3>What /vibe-audit finds (and fixes)</h3>
       <ul class="compare-list">
         <li>3 API routes with zero auth</li>
         <li>SQL injection in search endpoint</li>
@@ -302,12 +522,12 @@
     <div class="feature">
       <div class="feature-icon">1</div>
       <h3>Scan</h3>
-      <p>Detects your language, framework, database, auth, payments, storage, mobile — everything. Works with Next.js, Python, Go, Rust, Swift, and 15+ stacks.</p>
+      <p>Detects your language, framework, database, auth, payments, storage, mobile &mdash; everything. Works with Next.js, Python, Go, Rust, Swift, and 15+ stacks.</p>
     </div>
     <div class="feature">
       <div class="feature-icon">2</div>
       <h3>Generate</h3>
-      <p>Creates specialized AI agents tailored to YOUR stack. Build gate, QA signoff, security reviewer, orchestrator — each knows your tools.</p>
+      <p>Creates specialized AI agents tailored to YOUR stack. Build gate, QA signoff, security reviewer, orchestrator &mdash; each knows your tools.</p>
     </div>
     <div class="feature">
       <div class="feature-icon">3</div>
@@ -318,19 +538,19 @@
 
   <div class="commands">
     <div class="command">
-      <code>/team-audit</code>
+      <code>/vibe-audit</code>
       <p>Full codebase scan. Finds every problem. Fixes them all. Validates the build. 95% confidence.</p>
     </div>
     <div class="command">
-      <code>/team-review</code>
-      <p>Quick check — are your agents right for this codebase? Coverage gaps? Wrong tiers?</p>
+      <code>/vibe-review</code>
+      <p>Quick check &mdash; are your agents right for this codebase? Coverage gaps? Wrong tiers?</p>
     </div>
     <div class="command">
-      <code>/team-launch</code>
+      <code>/vibe-launch</code>
       <p>Give it multiple problems. Each gets its own orchestrator with 3 solutions. Wake up to fixes.</p>
     </div>
     <div class="command">
-      <code>/team-init</code>
+      <code>/vibe-init</code>
       <p>Re-run setup. Regenerate agents after your codebase evolves.</p>
     </div>
   </div>
@@ -348,14 +568,14 @@
       <div class="terminal-dot green"></div>
     </div>
     <div class="terminal-body"><span class="hl">Without cache:</span>
-  build-gate runs  → npm run build (1 min)  → 24KB output
-  qa-signoff runs  → npm run build (1 min)  → 24KB output  <span class="warn">← DUPLICATE</span>
-  regression runs  → npm run build (1 min)  → 24KB output  <span class="warn">← DUPLICATE</span>
+  build-gate runs  &#8594; npm run build (1 min)  &#8594; 24KB output
+  qa-signoff runs  &#8594; npm run build (1 min)  &#8594; 24KB output  <span class="warn">&#8592; DUPLICATE</span>
+  regression runs  &#8594; npm run build (1 min)  &#8594; 24KB output  <span class="warn">&#8592; DUPLICATE</span>
 
 <span class="hl">With cache ($3/month):</span>
-  build-gate runs  → npm run build (1 min)  → Caches 250-byte summary
-  qa-signoff runs  → Reads cache (instant)  → 250 bytes    <span class="success">← SAVED</span>
-  regression runs  → Reads cache (instant)  → 250 bytes    <span class="success">← SAVED</span>
+  build-gate runs  &#8594; npm run build (1 min)  &#8594; Caches 250-byte summary
+  qa-signoff runs  &#8594; Reads cache (instant)  &#8594; 250 bytes    <span class="success">&#8592; SAVED</span>
+  regression runs  &#8594; Reads cache (instant)  &#8594; 250 bytes    <span class="success">&#8592; SAVED</span>
 
   <span class="success">Tokens saved per cycle: 33,750 (~99.3%)</span>
   <span class="success">Daily savings (heavy use): $20-40</span>
@@ -366,23 +586,23 @@
 <!-- Pricing -->
 <section class="section" id="pricing">
   <h2>Pricing</h2>
-  <p class="section-sub">The tool is free. The cache pays for itself in an hour.</p>
+  <p class="section-sub">The preview is free. The full tool pays for itself in an hour.</p>
 
   <div class="pricing">
     <div class="price-card featured">
       <div class="price-name">Starter</div>
       <div class="price-amount">$29<span> one-time</span></div>
-      <div class="price-desc">Full agent team — yours forever</div>
+      <div class="price-desc">Full agent team &mdash; yours forever</div>
       <ul class="price-features">
         <li>Full agent team generation</li>
-        <li>/team-audit — finds + fixes everything</li>
-        <li>/team-review, /team-launch</li>
+        <li>/vibe-audit &mdash; finds + fixes everything</li>
+        <li>/vibe-review, /vibe-launch</li>
         <li>Orchestrator with 3-solution finder</li>
         <li>Auto-trigger hooks on edits + commits</li>
         <li>Unlimited agents</li>
         <li>Lifetime updates</li>
       </ul>
-      <button class="price-btn pro" onclick="checkout('starter')">Get CodeCrew — $29</button>
+      <button class="price-btn pro" onclick="checkout('starter')">Get vibe-crew &mdash; $29</button>
     </div>
 
     <div class="price-card">
@@ -397,7 +617,7 @@
         <li>Saves $20-40/day in tokens</li>
         <li>Priority support</li>
       </ul>
-      <button class="price-btn pro" onclick="checkout('pro')">Start Pro — $9/mo</button>
+      <button class="price-btn pro" onclick="checkout('pro')">Start Pro &mdash; $9/mo</button>
     </div>
 
     <div class="price-card">
@@ -411,7 +631,7 @@
         <li>Team savings analytics</li>
         <li>Slack integration</li>
       </ul>
-      <button class="price-btn team" onclick="checkout('team')">Start Team — $29/mo</button>
+      <button class="price-btn team" onclick="checkout('team')">Start Team &mdash; $29/mo</button>
     </div>
   </div>
 
@@ -423,20 +643,132 @@
   </div>
 </section>
 
+
+<!-- ==================== FAQ / HELP ==================== -->
+<section class="section" id="faq">
+  <h2>Help &amp; FAQ</h2>
+  <p class="section-sub">Everything you need to know about vibe-crew.</p>
+
+  <div class="faq-list">
+
+    <div class="faq-item">
+      <div class="faq-q">What exactly does vibe-crew generate?</div>
+      <div class="faq-a">
+        It generates a <code>.claude/</code> directory in your project containing: agent definitions (Markdown files that tell Claude Code how each specialized agent behaves), a <code>settings.json</code> with auto-trigger hooks, and a <code>CLAUDE.md</code> with project-level instructions. These are plain text files you can read, edit, and commit to your repo.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Does vibe-crew modify my source code?</div>
+      <div class="faq-a">
+        The <code>npx vibe-crew</code> setup command only writes files inside <code>.claude/</code>. It never touches your source code. However, when you run <code>/vibe-audit</code> inside Claude Code, the audit agents <strong>will</strong> make changes to fix the issues they find. You can review every change before accepting it, just like any Claude Code edit.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What languages and frameworks are supported?</div>
+      <div class="faq-a">
+        The scanner auto-detects: <strong>Next.js, React, Vue, Svelte, Angular, Express, Fastify, Django, Flask, FastAPI, Rails, Go, Rust, Swift/SwiftUI, Kotlin/Compose</strong>, and more. It also detects databases (Supabase, Postgres, MongoDB, Prisma), auth providers (Supabase Auth, Clerk, NextAuth), payment processors (Stripe), and deployment platforms (Vercel, Fly.io, AWS). If your stack isn't detected, the agents still work with a general-purpose configuration.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I didn't get my license email. What do I do?</div>
+      <div class="faq-a">
+        Check your spam/junk folder for an email from <code>noreply@picvaultpro.com</code>. The email is sent immediately after Stripe checkout completes. If you still can't find it after 5 minutes, email <code>support@picvaultpro.com</code> with your checkout email address and we'll resend your key.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I use my license key on multiple projects?</div>
+      <div class="faq-a">
+        Yes. Your license key is stored globally at <code>~/.vibe-crew/license</code>. Once activated, run <code>npx vibe-crew</code> in any project directory and it will generate agents for that project automatically. No per-project limits.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What's the difference between Starter and Pro?</div>
+      <div class="faq-a">
+        <strong>Starter ($29 one-time)</strong> gives you the full agent team, all slash commands, and auto-trigger hooks. This is everything you need to audit and fix your code.<br><br>
+        <strong>Pro ($9/mo)</strong> adds a managed Fly.io cache server. The cache prevents agents from repeating each other's work (like re-running builds). If you use Claude Code heavily (multiple agents running per session), the cache saves $20-40/day in tokens. It pays for itself within the first hour of heavy use.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I preview what agents would be generated?</div>
+      <div class="faq-a">
+        Run <code>npx vibe-crew --dry-run</code> in your project directory. This scans your codebase and shows you exactly which agents would be created, what they'd do, and which Claude model tier each would use &mdash; without writing any files or requiring a license key.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">What does /vibe-audit actually check?</div>
+      <div class="faq-a">
+        The audit scans for: <strong>security vulnerabilities</strong> (unprotected API routes, SQL injection, XSS, missing auth checks, weak RLS policies), <strong>dead code</strong> (unused functions, unreachable branches, orphan files), <strong>code quality</strong> (duplicated logic, god components, missing error boundaries), <strong>architecture issues</strong> (circular dependencies, leaky abstractions), and <strong>performance problems</strong> (N+1 queries, missing indexes, bundle size). Each finding is fixed automatically and validated by the build-gate agent.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Can I customize which agents run automatically?</div>
+      <div class="faq-a">
+        Yes. Open <code>.claude/settings.json</code> in your project. You'll see a <code>hooks</code> section that maps file patterns to agents. Remove an entry to stop that agent from auto-triggering, or add new patterns. You can also edit the agent Markdown files in <code>.claude/agents/</code> to change what each agent does.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I regenerate agents after my stack changes?</div>
+      <div class="faq-a">
+        Run <code>/vibe-init</code> inside Claude Code, or run <code>npx vibe-crew</code> again from your terminal. Both will re-scan your codebase and update the agent definitions to match your current stack.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Does it work offline?</div>
+      <div class="faq-a">
+        License validation requires an internet connection the first time. After that, if you go offline, the CLI will use your cached license and allow full functionality. The agents themselves run through Claude Code, which also requires internet access to communicate with the Claude API.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">How do I cancel my Pro or Team subscription?</div>
+      <div class="faq-a">
+        Email <code>support@picvaultpro.com</code> with your account email and we'll cancel immediately. Your agents and slash commands continue to work (those are local files), but the cache server will be deprovisioned at the end of your billing period.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">I'm getting "License no longer valid" &mdash; what happened?</div>
+      <div class="faq-a">
+        This means your license was cancelled or expired (usually from a failed payment on a Pro/Team subscription). Check your email for a payment failure notice from Stripe. If you believe this is an error, email <code>support@picvaultpro.com</code>. Starter licenses (one-time payment) never expire.
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Where can I get help or report bugs?</div>
+      <div class="faq-a">
+        Open an issue on <a href="https://github.com/jwhitf4770-a11y/claude-team-init/issues" style="color: var(--accent);">GitHub</a>, or email <code>support@picvaultpro.com</code>. Include the output of <code>npx vibe-crew --dry-run</code> so we can see your stack detection results.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
 <!-- Final CTA -->
 <section class="final-cta">
   <h2>Your code deserves a senior engineering team.</h2>
   <p>One command. Zero config. Start in 30 seconds.</p>
   <div class="install" style="margin: 0 auto;">
-    <code>npx codecrew</code>
-    <button onclick="navigator.clipboard.writeText('npx codecrew');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
+    <code>npx vibe-crew --dry-run</code>
+    <button onclick="navigator.clipboard.writeText('npx vibe-crew --dry-run');this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)">Copy</button>
   </div>
 </section>
 
 <footer>
   <p>
-    <a href="https://github.com/jwhitf4770-a11y/CodeCrew">GitHub</a> &middot;
-    MIT License &middot;
+    <a href="https://github.com/jwhitf4770-a11y/claude-team-init">GitHub</a> &middot;
+    <a href="#guide">Getting Started</a> &middot;
+    <a href="#faq">Help</a> &middot;
     Built by someone who burns tokens too
   </p>
 </footer>
@@ -454,16 +786,24 @@ async function checkout(plan) {
     if (data.url) window.location.href = data.url;
     else alert(data.error || 'Something went wrong');
   } catch (e) {
-    alert('Checkout unavailable — install the free tier to get started.');
+    alert('Checkout unavailable. Try again in a moment.');
   }
 }
 
 // Handle upgrade success
 const params = new URLSearchParams(window.location.search);
 if (params.get('upgraded')) {
-  alert('Welcome to ' + params.get('upgraded').charAt(0).toUpperCase() + params.get('upgraded').slice(1) + '! Check your email for setup instructions.');
+  alert('Welcome to ' + params.get('upgraded').charAt(0).toUpperCase() + params.get('upgraded').slice(1) + '! Check your email for your license key and setup instructions.');
   window.history.replaceState({}, '', '/');
 }
+
+// FAQ accordion
+document.querySelectorAll('.faq-q').forEach(q => {
+  q.addEventListener('click', () => {
+    const item = q.parentElement;
+    item.classList.toggle('open');
+  });
+});
 </script>
 
 </body>
