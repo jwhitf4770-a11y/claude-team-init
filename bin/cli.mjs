@@ -15,7 +15,13 @@ import { generateHooks } from '../src/generators/hooks.mjs';
 import { deployFlyio } from '../src/deployers/flyio.mjs';
 import { checkLicense, printLicensePrompt } from '../src/license.mjs';
 
-const VERSION = '0.1.4';
+import { readFile as readFileSync } from 'fs/promises';
+import { dirname as dirnamePkg } from 'path';
+import { fileURLToPath as fileURLToPathPkg } from 'url';
+
+const __dirnameCli = dirnamePkg(fileURLToPathPkg(import.meta.url));
+const pkgJson = JSON.parse(await readFileSync(resolve(__dirnameCli, '..', 'package.json'), 'utf-8'));
+const VERSION = pkgJson.version;
 
 async function main() {
   const args = process.argv.slice(2);
@@ -34,7 +40,16 @@ async function main() {
   let skipCache = args.includes('--no-cache');
   const skipAudit = args.includes('--no-audit');
   const dryRun = args.includes('--dry-run');
-  const positionalArgs = args.filter(a => !a.startsWith('-'));
+  // Filter out flags and their values (e.g. --key XXXX)
+  const flagsWithValues = ['--key'];
+  const positionalArgs = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('-')) {
+      if (flagsWithValues.includes(args[i])) i++; // skip the next arg too
+      continue;
+    }
+    positionalArgs.push(args[i]);
+  }
   const projectDir = resolve(positionalArgs[0] || '.');
 
   console.log('');

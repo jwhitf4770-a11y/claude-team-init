@@ -3,8 +3,11 @@ import { Resend } from 'resend';
 import { randomUUID } from 'crypto';
 import { supabase } from './lib/supabase.js';
 
+if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+  throw new Error('Missing required env vars: STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET');
+}
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export const config = {
   api: { bodyParser: false },
@@ -79,6 +82,10 @@ async function createLicense(customerId, plan, stripeSubscriptionId) {
 }
 
 async function sendLicenseEmail(email, licenseKey, plan) {
+  if (!resend) {
+    console.log(`Skipping email (RESEND_API_KEY not set): license ${licenseKey} for ${email}`);
+    return;
+  }
   const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
   const cacheNote = plan === 'starter'
     ? 'Your Starter plan includes agent generation. Upgrade to Pro for the shared Fly.io cache that saves $15+/day in tokens.'
