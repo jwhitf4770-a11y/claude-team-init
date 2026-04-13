@@ -13,8 +13,9 @@ import { generateClaudeMd } from '../src/generators/claudemd.mjs';
 import { generateSettings } from '../src/generators/settings.mjs';
 import { generateHooks } from '../src/generators/hooks.mjs';
 import { deployFlyio } from '../src/deployers/flyio.mjs';
+import { checkLicense, printLicensePrompt } from '../src/license.mjs';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.4';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -30,7 +31,7 @@ async function main() {
   }
 
   const yesAll = args.includes('--yes') || args.includes('-y');
-  const skipCache = args.includes('--no-cache');
+  let skipCache = args.includes('--no-cache');
   const skipAudit = args.includes('--no-audit');
   const dryRun = args.includes('--dry-run');
   const positionalArgs = args.filter(a => !a.startsWith('-'));
@@ -40,6 +41,21 @@ async function main() {
   console.log(chalk.bold.cyan('  CodeCrew'));
   console.log(chalk.gray('  Senior engineering team for your AI-generated code'));
   console.log('');
+
+  // License check
+  const license = await checkLicense(args);
+
+  if (!license.valid && !dryRun) {
+    console.log(chalk.yellow('  No license key found.'));
+    console.log('');
+    printLicensePrompt();
+    process.exit(0);
+  }
+
+  if (license.valid) {
+    console.log(chalk.gray(`  License: ${license.plan} plan`));
+    console.log('');
+  }
 
   // Step 1: Audit
   const spinner = ora('Scanning your codebase...').start();
@@ -113,6 +129,11 @@ async function main() {
 
   // Step 3: Fly.io cache
   let cacheConfig = null;
+  if (!skipCache && license.features?.cache === false) {
+    console.log(chalk.gray('  Cache requires Pro or Team plan. Upgrade at https://codecrew-mu.vercel.app'));
+    console.log('');
+    skipCache = true;
+  }
   if (!skipCache) {
     if (!yesAll) {
       const { setupCache } = await inquirer.prompt([{
