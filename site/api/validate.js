@@ -21,7 +21,16 @@ export default async function handler(req, res) {
     return res.json({ valid: false, error: 'Invalid license key' });
   }
 
-  if (license.status !== 'active') {
+  if (license.status === 'past_due') {
+    // 7-day grace period for failed payments
+    const updatedAt = new Date(license.updated_at || license.created_at);
+    const graceDays = 7;
+    const graceExpires = new Date(updatedAt.getTime() + graceDays * 24 * 60 * 60 * 1000);
+    if (new Date() > graceExpires) {
+      return res.json({ valid: false, error: 'Payment overdue — update your payment method to restore access' });
+    }
+    // Still in grace period — allow but warn
+  } else if (license.status !== 'active') {
     return res.json({ valid: false, error: `License is ${license.status}` });
   }
 

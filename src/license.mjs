@@ -1,11 +1,15 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, stat } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import chalk from 'chalk';
 
 const LICENSE_DIR = join(homedir(), '.vibe-crew');
 const LICENSE_FILE = join(LICENSE_DIR, 'license');
+const VALIDATED_FILE = join(LICENSE_DIR, 'last-validated');
 const VALIDATE_URL = 'https://codecrew-mu.vercel.app/api/validate';
+
+// Offline grace period: 7 days from last successful validation
+const OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function loadLicense() {
   try {
@@ -21,6 +25,24 @@ export async function saveLicense(key) {
   await writeFile(LICENSE_FILE, key.trim());
 }
 
+async function saveValidation(plan, features) {
+  await mkdir(LICENSE_DIR, { recursive: true });
+  await writeFile(VALIDATED_FILE, JSON.stringify({
+    at: Date.now(),
+    plan,
+    features,
+  }));
+}
+
+async function loadLastValidation() {
+  try {
+    const content = await readFile(VALIDATED_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
 export async function validateLicense(key) {
   try {
     const res = await fetch(VALIDATE_URL, {
@@ -33,10 +55,29 @@ export async function validateLicense(key) {
       return { valid: false, error: 'Could not reach license server' };
     }
 
-    return await res.json();
+    const result = await res.json();
+
+    // Cache successful validations for offline grace period
+    if (result.valid) {
+      await saveValidation(result.plan, result.features);
+    }
+
+    return result;
   } catch {
-    // Offline — allow cached license to work
-    return { valid: true, plan: 'offline', features: { agents: true, cache: true, team: false } };
+    // Offline — check if within grace period
+    const last = await loadLastValidation();
+    if (last && (Date.now() - last.at) < OFFLINE_GRACE_MS) {
+      const daysLeft = Math.ceil((OFFLINE_GRACE_MS - (Date.now() - last.at)) / (24 * 60 * 60 * 1000));
+      return {
+        valid: true,
+        plan: last.plan,
+        features: last.features,
+        offline: true,
+        offlineDaysLeft: daysLeft,
+      };
+    }
+
+    return { valid: false, error: 'Offline too long — connect to the internet to re-validate your license' };
   }
 }
 

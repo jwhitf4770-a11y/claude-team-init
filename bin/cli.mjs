@@ -53,7 +53,11 @@ async function main() {
   }
 
   if (license.valid) {
-    console.log(chalk.gray(`  License: ${license.plan} plan`));
+    if (license.offline) {
+      console.log(chalk.yellow(`  License: ${license.plan} plan (offline — ${license.offlineDaysLeft} days until re-validation required)`));
+    } else {
+      console.log(chalk.gray(`  License: ${license.plan} plan`));
+    }
     console.log('');
   }
 

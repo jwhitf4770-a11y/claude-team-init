@@ -176,7 +176,7 @@ export default async function handler(req, res) {
       if (licenses?.length) {
         await supabase
           .from('licenses')
-          .update({ status: 'cancelled' })
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', subscription.id);
 
         console.log(`Licenses cancelled for subscription ${subscription.id}`);
@@ -190,7 +190,7 @@ export default async function handler(req, res) {
       if (invoice.subscription) {
         await supabase
           .from('licenses')
-          .update({ status: 'past_due' })
+          .update({ status: 'past_due', updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', invoice.subscription);
 
         console.log(`License past_due for subscription ${invoice.subscription}`);
@@ -204,7 +204,7 @@ export default async function handler(req, res) {
       if (invoice.subscription) {
         await supabase
           .from('licenses')
-          .update({ status: 'active' })
+          .update({ status: 'active', updated_at: new Date().toISOString() })
           .eq('stripe_subscription_id', invoice.subscription);
       }
       break;
