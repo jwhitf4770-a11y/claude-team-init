@@ -3,3 +3,27 @@ node_modules/
 *.log
 .env
 .env.local
+.env.*.local
+
+# Build outputs
+dist/
+.next/
+out/
+
+# Test artifacts
+e2e-results/
+e2e-report/
+test-results/
+
+# Generated output directories (from CLI runs)
+[0-9A-F]*-*-*-*/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Supabase temp
+supabase/.temp/

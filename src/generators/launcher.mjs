@@ -21,7 +21,7 @@ function generateLauncherScript(projectDir, cacheConfig) {
 
 set -euo pipefail
 
-REPO="${projectDir}"
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
 TMUX_SESSION="agents"
 WINDOW_OFFSET=10
 MONITOR_INTERVAL=30
@@ -92,8 +92,12 @@ ${cacheConfig ? `
 
     tmux set-window-option -t "\${TMUX_SESSION}:\${window_name}" remain-on-exit on 2>/dev/null || true
 
+    # Write problem to temp file to avoid shell injection
+    local problem_file="/tmp/orch-\${sid}-problem.txt"
+    printf '%s' "$problem" > "$problem_file"
+
     tmux send-keys -t "\${TMUX_SESSION}:\${window_name}" \\
-      "cd \${REPO} && claude --agent orchestrator --permission-mode dontAsk --worktree \${sid} --append-system-prompt 'SESSION_ID=\${sid}' -p '\${problem//\\'/\\\\'\\'\\\\'}' 2>&1 | tee /tmp/orch-\${sid}.log; echo '--- ORCHESTRATOR \${sid} FINISHED ---'" Enter
+      "cd \${REPO} && claude --agent orchestrator --permission-mode dontAsk --worktree \${sid} --append-system-prompt 'SESSION_ID=\${sid}' -p \\"\\$(cat /tmp/orch-\${sid}-problem.txt)\\" 2>&1 | tee /tmp/orch-\${sid}.log; echo '--- ORCHESTRATOR \${sid} FINISHED ---'" Enter
   done
 
   echo ""
@@ -108,27 +112,20 @@ monitor_orchestrators() {
   echo ""
   while true; do
     local running=0 finished=0 failed=0
-    for window in $(tmux list-windows -t "$TMUX_SESSION" -F '#{window_name}' 2>/dev/null || echo ""); do
-      if [[ "$window" == orch-* ]]; then
-        local logfile="/tmp/orch-team-*.log"
-        # Check if the orchestrator has finished
-        if ls /tmp/orch-team-*.log &>/dev/null; then
-          for lf in /tmp/orch-team-*.log; do
-            if grep -q "ORCHESTRATOR.*FINISHED" "$lf" 2>/dev/null; then
-              if grep -q "ACCEPTED" "$lf" 2>/dev/null; then
-                ((finished++))
-              elif grep -q "FAIL" "$lf" 2>/dev/null; then
-                ((failed++))
-              else
-                ((running++))
-              fi
-            else
-              ((running++))
-            fi
-          done
+
+    # Iterate log files directly — each log file = one orchestrator
+    for lf in /tmp/orch-team-*.log; do
+      [ -f "$lf" ] || continue
+      if grep -q "ORCHESTRATOR.*FINISHED" "$lf" 2>/dev/null; then
+        if grep -q "ACCEPTED" "$lf" 2>/dev/null; then
+          ((finished++))
+        elif grep -q "FAIL" "$lf" 2>/dev/null; then
+          ((failed++))
         else
           ((running++))
         fi
+      else
+        ((running++))
       fi
     done
 

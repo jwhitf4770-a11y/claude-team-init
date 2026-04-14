@@ -1,5 +1,8 @@
 import Stripe from 'stripe';
 
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required env var: STRIPE_SECRET_KEY');
+}
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const PRICES = {
@@ -46,11 +49,7 @@ export default async function handler(req, res) {
   if (upperCode && PROMO_CODES[upperCode]) {
     const couponId = PROMO_CODES[upperCode][plan];
     if (couponId) {
-      if (isOneTime) {
-        sessionParams.discounts = [{ coupon: couponId }];
-      } else {
-        sessionParams.discounts = [{ coupon: couponId }];
-      }
+      sessionParams.discounts = [{ coupon: couponId }];
     }
   } else if (upperCode) {
     return res.status(400).json({ error: 'Invalid promo code' });

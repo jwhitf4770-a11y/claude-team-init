@@ -1,19 +1,7 @@
 import { Router } from 'express';
-import { getTenantByApiKey } from '../store.mjs';
+import { auth } from '../middleware.mjs';
 
 export const router = Router();
-
-// Auth middleware — resolves tenant from Bearer token
-function auth(req, res, next) {
-  const bearer = req.headers.authorization?.replace('Bearer ', '');
-  if (!bearer) return res.status(401).json({ error: 'unauthorized' });
-
-  const tenant = getTenantByApiKey(bearer);
-  if (!tenant) return res.status(401).json({ error: 'invalid api key' });
-
-  req.tenant = tenant;
-  next();
-}
 
 // Cache set
 router.post('/cache-set', auth, (req, res) => {
@@ -107,7 +95,7 @@ router.get('/cache-stats', auth, (req, res) => {
 
   res.json({
     plan: tenant.plan,
-    entries: entries.length,
+    entries_count: entries.length,
     limit: tenant.limits.maxKeys,
     total_reads: totalReads,
     total_tokens_saved: totalTokensSaved,

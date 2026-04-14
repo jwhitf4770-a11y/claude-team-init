@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
-import { getTenantByApiKey, getTenantByStripeCustomerId, upgradeTenant } from '../store.mjs';
+import { getTenantByStripeCustomerId, upgradeTenant } from '../store.mjs';
+import { auth } from '../middleware.mjs';
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -15,16 +16,6 @@ const PRICES = {
   pro: process.env.STRIPE_PRICE_PRO || '',    // $9/month
   team: process.env.STRIPE_PRICE_TEAM || '',   // $29/month
 };
-
-// Auth middleware
-function auth(req, res, next) {
-  const bearer = req.headers.authorization?.replace('Bearer ', '');
-  if (!bearer) return res.status(401).json({ error: 'unauthorized' });
-  const tenant = getTenantByApiKey(bearer);
-  if (!tenant) return res.status(401).json({ error: 'invalid api key' });
-  req.tenant = tenant;
-  next();
-}
 
 // Get current plan
 router.get('/plan', auth, (req, res) => {

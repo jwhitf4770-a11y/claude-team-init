@@ -1,16 +1,7 @@
 import { Router } from 'express';
-import { getTenantByApiKey } from '../store.mjs';
+import { auth } from '../middleware.mjs';
 
 export const router = Router();
-
-function auth(req, res, next) {
-  const bearer = req.headers.authorization?.replace('Bearer ', '');
-  if (!bearer) return res.status(401).json({ error: 'unauthorized' });
-  const tenant = getTenantByApiKey(bearer);
-  if (!tenant) return res.status(401).json({ error: 'invalid api key' });
-  req.tenant = tenant;
-  next();
-}
 
 // Dashboard data — single endpoint for the frontend
 router.get('/data', auth, (req, res) => {

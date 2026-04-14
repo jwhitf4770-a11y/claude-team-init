@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 
 // ─── In-Memory Tenant Store ─────────────────────────────────────────────────
 // In production, swap this for Postgres/Redis. For MVP this is fine —

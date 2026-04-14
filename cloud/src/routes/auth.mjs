@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createTenant, getTenantByEmail } from '../store.mjs';
+import { auth } from '../middleware.mjs';
 
 export const router = Router();
 
@@ -31,7 +32,7 @@ router.post('/signup', (req, res) => {
 });
 
 // Get account info
-router.get('/me', (req, res) => {
+router.get('/me', auth, (req, res) => {
   const tenant = req.tenant;
   if (!tenant) return res.status(401).json({ error: 'unauthorized' });
 
