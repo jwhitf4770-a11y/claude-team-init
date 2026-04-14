@@ -1,6 +1,6 @@
 {
   "name": "vibe-crew",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "AI agent team bootstrapper for any codebase. One command to set up specialized agents + Fly.io cache.",
   "bin": {
     "codecrew": "./bin/cli.mjs",
