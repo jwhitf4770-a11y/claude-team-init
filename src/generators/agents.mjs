@@ -415,7 +415,7 @@ scripts/cache-hook.sh set "orch-\${SID}-candidate-3" '<json>' 43200 2>/dev/null 
 ` : ''}
 ## Phase 3: Implement and Validate Each Candidate
 
-For each candidate (sequentially):
+**Preferred execution model:** spawn each candidate as a sub-Agent with \`isolation: "worktree"\`. Claude Code will auto-create an isolated git worktree per candidate so they run safely in parallel and are cleaned up automatically if no changes land. The per-candidate branch flow below is the fallback when worktree isolation is unavailable.
 
 ### 3a. Create a branch
 \`\`\`bash

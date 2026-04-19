@@ -14,56 +14,135 @@ export async function generateHooks(projectDir, audit, agentPlan, cacheConfig) {
     settings = {};
   }
 
-  // Also generate a rules.json with agent trigger rules
   await generateRules(claudeDir, audit, agentPlan);
 
-  // Add hooks to settings — these auto-run agents on specific events
   if (!settings.hooks) settings.hooks = {};
 
-  // After code edits → build-gate catches type errors immediately
-  settings.hooks['postToolUse'] = settings.hooks['postToolUse'] || [];
+  const buildCmd = audit.buildCmd;
+  const testCmd = audit.testCmd;
+  const hasCache = Boolean(cacheConfig);
 
-  // Build-gate after Edit/Write (catches errors fast)
-  settings.hooks['postToolUse'].push({
-    matcher: 'Edit|Write',
-    command: 'claude -p --agent build-gate --permission-mode dontAsk "Verify the build still passes after recent edits." 2>/dev/null || true',
-    description: 'Auto build-gate after code edits',
-    runInBackground: true,
+  // PostToolUse: after Edit/Write/MultiEdit run build in background, cache the result.
+  // Hook commands cannot recursively spawn `claude -p`; they are plain shell.
+  if (buildCmd) {
+    settings.hooks.PostToolUse = settings.hooks.PostToolUse || [];
+    settings.hooks.PostToolUse.push({
+      matcher: 'Edit|Write|MultiEdit',
+      hooks: [
+        {
+          type: 'command',
+          command: buildPostEditCommand(buildCmd, hasCache),
+        },
+      ],
+    });
+  }
+
+  // UserPromptSubmit: inject a short status line (last build + cache health) so the
+  // main session sees up-to-date context without an extra tool call.
+  if (hasCache || buildCmd) {
+    settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit || [];
+    settings.hooks.UserPromptSubmit.push({
+      hooks: [
+        {
+          type: 'command',
+          command: buildStatusInjection(hasCache),
+        },
+      ],
+    });
+  }
+
+  // SessionStart: show the team roster once per session.
+  settings.hooks.SessionStart = settings.hooks.SessionStart || [];
+  settings.hooks.SessionStart.push({
+    matcher: 'startup|resume',
+    hooks: [
+      {
+        type: 'command',
+        command: buildSessionStart(agentPlan, hasCache),
+      },
+    ],
   });
 
-  // After git commit → run the validation pipeline
-  settings.hooks['postToolUse'].push({
-    matcher: 'Bash:*git commit*',
-    command: buildPostCommitPipeline(agentPlan, cacheConfig),
-    description: 'Post-commit agent validation pipeline',
-    runInBackground: true,
+  // Stop: flush a session summary to the cache so the next run has context.
+  if (hasCache) {
+    settings.hooks.Stop = settings.hooks.Stop || [];
+    settings.hooks.Stop.push({
+      hooks: [
+        {
+          type: 'command',
+          command: `scripts/cache-hook.sh set "last-session-end" "\\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\\"" 86400 2>/dev/null || true`,
+        },
+      ],
+    });
+  }
+
+  // PreToolUse: refuse destructive git operations even if permissions slip through.
+  settings.hooks.PreToolUse = settings.hooks.PreToolUse || [];
+  settings.hooks.PreToolUse.push({
+    matcher: 'Bash',
+    hooks: [
+      {
+        type: 'command',
+        command: destructiveGitGuard(),
+      },
+    ],
   });
 
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
 }
 
-function buildPostCommitPipeline(agentPlan, cacheConfig) {
-  // Sequential pipeline: build → regression → specialists → qa-signoff
-  const stages = ['build-gate', 'regression-checker'];
+function buildPostEditCommand(buildCmd, hasCache) {
+  const cacheWrite = hasCache
+    ? `scripts/cache-hook.sh cache-build "$status" "$(tail -c 400 "$logfile")" '[]' 2>/dev/null || true`
+    : `:`;
 
-  const specialistNames = agentPlan.map(a => a.name);
-  if (specialistNames.includes('security-reviewer')) stages.push('security-reviewer');
-  if (specialistNames.includes('api-prober')) stages.push('api-prober');
+  return [
+    `logfile=$(mktemp -t vibe-build.XXXXXX)`,
+    `( ${buildCmd} ) >"$logfile" 2>&1 && status=success || status=fail`,
+    cacheWrite,
+    `if [ "$status" = "fail" ]; then`,
+    `  echo "[vibe-crew] build-gate FAIL — see $logfile" >&2`,
+    `  exit 2`, // exit 2 = block and show stderr to the model
+    `fi`,
+    `rm -f "$logfile"`,
+  ].join('; ');
+}
 
-  // qa-signoff always last
-  stages.push('qa-signoff');
+function buildStatusInjection(hasCache) {
+  if (!hasCache) {
+    return `echo "[vibe-crew] $(date -u +%H:%MZ)"`;
+  }
+  return [
+    `build=$(scripts/cache-hook.sh get build-output 2>/dev/null | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)`,
+    `health=$(scripts/cache-hook.sh health 2>/dev/null | head -1)`,
+    `echo "[vibe-crew] build:\${build:-unknown} cache:\${health:-offline}"`,
+  ].join('; ');
+}
 
-  const cmds = stages.map(a =>
-    `claude -p --agent ${a} --permission-mode dontAsk "Validate the latest commit." 2>/dev/null || true`
-  );
+function buildSessionStart(agentPlan, hasCache) {
+  const roster = agentPlan.map(a => a.name).join(', ');
+  const cacheLine = hasCache
+    ? ` && scripts/cache-hook.sh health 2>/dev/null || true`
+    : '';
+  return `echo "[vibe-crew] team: ${roster}"${cacheLine}`;
+}
 
-  return cmds.join(' && ');
+function destructiveGitGuard() {
+  // Reads the PreToolUse payload on stdin and blocks obvious destructive git calls.
+  return [
+    `payload=$(cat)`,
+    `cmd=$(printf '%s' "$payload" | sed -n 's/.*"command":"\\([^"]*\\)".*/\\1/p')`,
+    `case "$cmd" in`,
+    `  *"git push"*"--force"*|*"git push"*" -f "*|*"git reset --hard"*|*"git commit"*"--no-verify"*)`,
+    `    echo "[vibe-crew] blocked destructive git: $cmd" >&2; exit 2 ;;`,
+    `esac`,
+    `exit 0`,
+  ].join('; ');
 }
 
 async function generateRules(claudeDir, audit, agentPlan) {
   const rulesPath = join(claudeDir, 'rules.json');
 
-  // Don't overwrite existing rules
   try {
     await readFile(rulesPath);
     return;
@@ -79,7 +158,6 @@ async function generateRules(claudeDir, audit, agentPlan) {
     rules: [],
   };
 
-  // Rule 1: Build-gate required for all source changes
   const srcExtensions = {
     'JavaScript/TypeScript': '**/*.{ts,tsx,js,jsx,mjs}',
     'Python': '**/*.py',
@@ -109,7 +187,6 @@ async function generateRules(claudeDir, audit, agentPlan) {
     },
   });
 
-  // Rule 2: Security reviewer on DB/auth changes
   if (agentNames.includes('security-reviewer') && audit.database) {
     const dbTriggers = [];
     if (audit.database === 'Supabase') {
@@ -134,7 +211,6 @@ async function generateRules(claudeDir, audit, agentPlan) {
     });
   }
 
-  // Rule 3: Mobile expert on API changes (if mobile exists)
   if (agentNames.includes('mobile-expert') && audit.hasApi) {
     rules.rules.push({
       id: 'auto-mobile-compat',
@@ -154,7 +230,6 @@ async function generateRules(claudeDir, audit, agentPlan) {
     });
   }
 
-  // Rule 4: Auth verifier on auth changes
   if (agentNames.includes('auth-verifier') && audit.auth) {
     rules.rules.push({
       id: 'auto-auth-verify',
@@ -176,7 +251,6 @@ async function generateRules(claudeDir, audit, agentPlan) {
     });
   }
 
-  // Rule 5: Billing bot on payment changes
   if (agentNames.includes('billing-bot') && audit.payments) {
     rules.rules.push({
       id: 'auto-billing-check',
@@ -199,7 +273,6 @@ async function generateRules(claudeDir, audit, agentPlan) {
     });
   }
 
-  // Rule 6: Crypto auditor on encryption changes
   if (agentNames.includes('crypto-auditor') && audit.hasCrypto) {
     rules.rules.push({
       id: 'auto-crypto-audit',
@@ -221,7 +294,6 @@ async function generateRules(claudeDir, audit, agentPlan) {
     });
   }
 
-  // Rule 7: Regression checker always after qa-signoff approves
   rules.rules.push({
     id: 'post-commit-pipeline',
     title: 'Post-Commit Validation Pipeline',

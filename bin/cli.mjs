@@ -12,6 +12,7 @@ import { generateLauncher } from '../src/generators/launcher.mjs';
 import { generateClaudeMd } from '../src/generators/claudemd.mjs';
 import { generateSettings } from '../src/generators/settings.mjs';
 import { generateHooks } from '../src/generators/hooks.mjs';
+import { generateStatusline } from '../src/generators/statusline.mjs';
 import { deployFlyio } from '../src/deployers/flyio.mjs';
 import { checkLicense, printLicensePrompt } from '../src/license.mjs';
 
@@ -187,6 +188,8 @@ async function main() {
     await generateSettings(projectDir, audit);
     genSpinner.text = 'Configuring agent hooks...';
     await generateHooks(projectDir, audit, agentPlan, cacheConfig);
+    genSpinner.text = 'Installing statusline...';
+    await generateStatusline(projectDir, audit, cacheConfig);
     genSpinner.succeed('Agent team generated!');
   } catch (err) {
     genSpinner.fail('Generation failed');
