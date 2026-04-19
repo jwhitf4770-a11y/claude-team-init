@@ -96,16 +96,18 @@ function buildPostEditCommand(buildCmd, hasCache) {
     ? `scripts/cache-hook.sh cache-build "$status" "$(tail -c 400 "$logfile")" '[]' 2>/dev/null || true`
     : `:`;
 
+  // `if ... then` and `fi` are structural — must be separated by newlines, not semicolons.
+  // `mktemp` without args is portable between BSD (macOS) and GNU (Linux).
   return [
-    `logfile=$(mktemp -t vibe-build.XXXXXX)`,
+    `logfile=$(mktemp)`,
     `( ${buildCmd} ) >"$logfile" 2>&1 && status=success || status=fail`,
     cacheWrite,
     `if [ "$status" = "fail" ]; then`,
     `  echo "[vibe-crew] build-gate FAIL — see $logfile" >&2`,
-    `  exit 2`, // exit 2 = block and show stderr to the model
+    `  exit 2`,
     `fi`,
     `rm -f "$logfile"`,
-  ].join('; ');
+  ].join('\n');
 }
 
 function buildStatusInjection(hasCache) {
@@ -129,15 +131,19 @@ function buildSessionStart(agentPlan, hasCache) {
 
 function destructiveGitGuard() {
   // Reads the PreToolUse payload on stdin and blocks obvious destructive git calls.
+  // NOTE: `case ... in` and `esac` are structural keywords — must be separated by
+  // newlines, not semicolons. A `; ` join here produces a syntax error.
   return [
     `payload=$(cat)`,
     `cmd=$(printf '%s' "$payload" | sed -n 's/.*"command":"\\([^"]*\\)".*/\\1/p')`,
     `case "$cmd" in`,
     `  *"git push"*"--force"*|*"git push"*" -f "*|*"git reset --hard"*|*"git commit"*"--no-verify"*)`,
-    `    echo "[vibe-crew] blocked destructive git: $cmd" >&2; exit 2 ;;`,
+    `    echo "[vibe-crew] blocked destructive git: $cmd" >&2`,
+    `    exit 2`,
+    `    ;;`,
     `esac`,
     `exit 0`,
-  ].join('; ');
+  ].join('\n');
 }
 
 async function generateRules(claudeDir, audit, agentPlan) {
