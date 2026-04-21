@@ -292,6 +292,14 @@ function buildAgentPlan(audit) {
     agents.push({ name: 'crypto-auditor', model: 'sonnet', reason: 'Encryption integrity audit' });
   }
 
+  // Infrastructure agents — always included
+  agents.push({ name: 'infra-auditor', model: 'haiku', reason: 'Fly.io / Vercel / Supabase waste detection' });
+  agents.push({ name: 'security-patcher', model: 'haiku', reason: 'npm audit auto-fix at 97% confidence' });
+
+  if (audit.hasApi) {
+    agents.push({ name: 'rate-limit-specialist', model: 'sonnet', reason: 'Rate limit backend selection (in-memory → KV → Redis)' });
+  }
+
   return agents;
 }
 
