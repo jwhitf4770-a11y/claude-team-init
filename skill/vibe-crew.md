@@ -16,11 +16,12 @@ FIRST TIME SETUP (do this once per project):
   npx claude-team-init -y         Scans your code, generates agents, deploys cache
 
 WHAT HAPPENS AUTOMATICALLY (you don't need to do anything):
-  - Every time you edit a file → build-gate checks it compiles
-  - Every time you commit → full pipeline runs (build + tests + regression check)
-  - Touch auth code → auth-verifier activates
-  - Touch payment code → billing-bot activates
-  - Touch database code → security-reviewer activates
+  - End of each turn that changed source code → one build (Stop hook),
+    skipped when this exact tree was already built; errors come back capped
+  - Agents read that cached build/test digest instead of rebuilding
+  - Docs/comment-only changes → nothing runs
+  - Before handoff → build-gate, regression-checker, qa-signoff once
+    (security-reviewer covers auth, payments, uploads, DB and crypto)
   These are configured in .claude/settings.local.json
 
 COMMANDS YOU RUN YOURSELF:

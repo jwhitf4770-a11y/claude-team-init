@@ -15,6 +15,7 @@ import { generateHooks } from '../src/generators/hooks.mjs';
 import { generateStatusline } from '../src/generators/statusline.mjs';
 import { deployFlyio } from '../src/deployers/flyio.mjs';
 import { checkLicense, printLicensePrompt } from '../src/license.mjs';
+import { buildAgentPlan } from '../src/plan.mjs';
 
 import { readFile as readFileSync } from 'fs/promises';
 import { dirname as dirnamePkg } from 'path';
@@ -106,7 +107,7 @@ async function main() {
   console.log('');
 
   // Step 2: Show agent plan
-  const agentPlan = buildAgentPlan(audit);
+  const agentPlan = buildAgentPlan(audit, { infra: args.includes('--infra'), rateLimit: args.includes('--rate-limit') });
 
   console.log(chalk.bold('  Agents to generate:'));
   for (const agent of agentPlan) {
@@ -126,7 +127,7 @@ async function main() {
     }
     console.log(`    ${chalk.gray('.claude/settings.local.json')}`);
     console.log(`    ${chalk.gray('scripts/team-launch.sh')}`);
-    if (!skipCache) console.log(`    ${chalk.gray('scripts/cache-hook.sh')}`);
+    console.log(`    ${chalk.gray('scripts/cache-hook.sh')}`);
     console.log(`    ${chalk.gray('CLAUDE.md')}`);
     console.log('');
     process.exit(0);
@@ -178,7 +179,7 @@ async function main() {
   try {
     await generateAgents(projectDir, agentPlan, audit, cacheConfig);
     genSpinner.text = 'Generating cache hook...';
-    await generateCachehook(projectDir, cacheConfig);
+    await generateCachehook(projectDir, audit, cacheConfig);
     genSpinner.text = 'Generating team launcher...';
     await generateLauncher(projectDir, audit, cacheConfig);
     genSpinner.text = 'Generating CLAUDE.md...';
@@ -256,52 +257,6 @@ async function main() {
   console.log('');
 }
 
-function buildAgentPlan(audit) {
-  const agents = [
-    { name: 'build-gate', model: 'haiku', reason: 'Build + lint verification' },
-    { name: 'qa-signoff', model: 'sonnet', reason: 'Final QA with physical proof' },
-    { name: 'regression-checker', model: 'haiku', reason: 'Side effect detection' },
-    { name: 'orchestrator', model: 'opus', reason: '3-solution finder with confidence scoring' },
-    { name: 'team-audit', model: 'opus', reason: 'Full code audit + auto-fix to 95% confidence' },
-    { name: 'team-review', model: 'sonnet', reason: 'Fast agent team fitness evaluation' },
-  ];
-
-  if (audit.testCmd) {
-    agents.push({ name: 'test-writer', model: 'sonnet', reason: `Test generation (${audit.testRunner || 'detected'})` });
-  }
-  if (audit.hasApi) {
-    agents.push({ name: 'api-prober', model: 'haiku', reason: 'API endpoint testing' });
-  }
-  if (audit.auth) {
-    agents.push({ name: 'auth-verifier', model: 'sonnet', reason: `Auth flow validation (${audit.auth})` });
-  }
-  if (audit.payments) {
-    agents.push({ name: 'billing-bot', model: 'sonnet', reason: `Payment integration (${audit.payments})` });
-  }
-  if (audit.storage) {
-    agents.push({ name: 'upload-bot', model: 'sonnet', reason: `Storage/upload validation (${audit.storage})` });
-  }
-  if (audit.database) {
-    agents.push({ name: 'security-reviewer', model: 'sonnet', reason: `DB security audit (${audit.database})` });
-  }
-  if (audit.hasMobile) {
-    agents.push({ name: 'mobile-expert', model: 'sonnet', reason: 'Mobile compatibility check' });
-  }
-  if (audit.hasCrypto) {
-    agents.push({ name: 'crypto-auditor', model: 'sonnet', reason: 'Encryption integrity audit' });
-  }
-
-  // Infrastructure agents — always included
-  agents.push({ name: 'infra-auditor', model: 'haiku', reason: 'Fly.io / Vercel / Supabase waste detection' });
-  agents.push({ name: 'security-patcher', model: 'haiku', reason: 'npm audit auto-fix at 97% confidence' });
-
-  if (audit.hasApi) {
-    agents.push({ name: 'rate-limit-specialist', model: 'sonnet', reason: 'Rate limit backend selection (in-memory → KV → Redis)' });
-  }
-
-  return agents;
-}
-
 function printHelp() {
   console.log(`
 ${chalk.bold('CodeCrew')} — Senior engineering team for your AI-generated code
@@ -319,6 +274,8 @@ ${chalk.bold('Options:')}
   --no-cache      Skip Fly.io cache setup
   --no-audit      Skip initial code audit
   --dry-run       Preview without writing files
+  --infra         Add infra-auditor (auto when fly.toml / vercel.json / netlify.toml / supabase config exist)
+  --rate-limit    Add rate-limit-specialist (auto when a rate-limit library is installed)
 
 ${chalk.bold('After setup, inside Claude Code:')}
   /vibe-audit     Audit + fix your entire codebase

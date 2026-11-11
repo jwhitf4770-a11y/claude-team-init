@@ -28,22 +28,13 @@ export async function generateHooks(projectDir, audit, agentPlan, cacheConfig) {
     if (settings.hooks[ev].length === 0) delete settings.hooks[ev];
   }
 
-  const buildCmd = audit.buildCmd;
-  const testCmd = audit.testCmd;
-  const hasCache = Boolean(cacheConfig);
-
-  // PostToolUse: after Edit/Write/MultiEdit run build in background, cache the result.
-  // Hook commands cannot recursively spawn `claude -p`; they are plain shell.
-  if (buildCmd) {
-    settings.hooks.PostToolUse = settings.hooks.PostToolUse || [];
-    settings.hooks.PostToolUse.push({
-      matcher: 'Edit|Write|MultiEdit',
-      hooks: [
-        {
-          type: 'command',
-          command: MARK + buildPostEditCommand(buildCmd, hasCache),
-        },
-      ],
+  // Stop: the ONE builder. Once per turn, only when uncommitted source files changed,
+  // skipped on a cached digest for the same tree, blocks at most once (stop_hook_active).
+  // Logic lives in scripts/cache-hook.sh so it can be tested and `bash -n` checked.
+  if (audit.buildCmd) {
+    settings.hooks.Stop = settings.hooks.Stop || [];
+    settings.hooks.Stop.push({
+      hooks: [{ type: 'command', command: MARK + '"${CLAUDE_PROJECT_DIR:-.}/scripts/cache-hook.sh" stop-check' }],
     });
   }
 
@@ -60,25 +51,6 @@ export async function generateHooks(projectDir, audit, agentPlan, cacheConfig) {
   });
 
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-}
-
-function buildPostEditCommand(buildCmd, hasCache) {
-  const cacheWrite = hasCache
-    ? `scripts/cache-hook.sh cache-build "$status" "$(tail -c 400 "$logfile")" '[]' 2>/dev/null || true`
-    : `:`;
-
-  // `if ... then` and `fi` are structural — must be separated by newlines, not semicolons.
-  // `mktemp` without args is portable between BSD (macOS) and GNU (Linux).
-  return [
-    `logfile=$(mktemp)`,
-    `( ${buildCmd} ) >"$logfile" 2>&1 && status=success || status=fail`,
-    cacheWrite,
-    `if [ "$status" = "fail" ]; then`,
-    `  echo "[vibe-crew] build-gate FAIL — see $logfile" >&2`,
-    `  exit 2`,
-    `fi`,
-    `rm -f "$logfile"`,
-  ].join('\n');
 }
 
 function destructiveGitGuard() {

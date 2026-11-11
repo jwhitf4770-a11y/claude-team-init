@@ -27,3 +27,6 @@ test-results/
 
 # Supabase temp
 supabase/.temp/
+
+# Cache server local data (cloud/ run outside Fly)
+cloud/data/

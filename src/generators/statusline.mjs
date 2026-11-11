@@ -30,20 +30,11 @@ export async function generateStatusline(projectDir, audit, cacheConfig) {
 }
 
 function buildStatuslineScript(hasCache) {
-  const cacheBlock = hasCache
-    ? `
-  build=$(scripts/cache-hook.sh get build-output 2>/dev/null \\
-            | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)
+  // Local reads only: a statusline renders constantly, so no network calls here.
+  const cacheBlock = `
+  build=$(scripts/cache-hook.sh last build 2>/dev/null | cut -d' ' -f2)
   build=\${build:-?}
-  if scripts/cache-hook.sh health 2>/dev/null | grep -q healthy; then
-    cache="on"
-  else
-    cache="off"
-  fi
-`
-    : `
-  build="?"
-  cache="-"
+  cache=${hasCache ? 'remote' : 'local'}
 `;
 
   return `#!/bin/bash

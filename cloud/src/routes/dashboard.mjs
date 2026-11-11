@@ -43,6 +43,9 @@ router.get('/data', auth, (req, res) => {
     });
   }
 
+  const hits = tenant.stats.totalReads;
+  const misses = tenant.stats.totalMisses || 0;
+
   // Cost estimate: ~$0.01 per 1000 tokens (rough Opus average)
   const costSaved = totalTokensSaved / 100000;
 
@@ -57,9 +60,12 @@ router.get('/data', auth, (req, res) => {
       estimated_cost_saved: `$${costSaved.toFixed(2)}`,
       total_reads: totalReads,
       total_writes: totalWrites,
-      cache_hit_rate: totalReads + totalWrites > 0
-        ? `${((totalReads / (totalReads + totalWrites)) * 100).toFixed(1)}%`
+      // hits / (hits + misses); writes are not lookups
+      cache_hit_rate: hits + misses > 0
+        ? `${((hits / (hits + misses)) * 100).toFixed(1)}%`
         : '0%',
+      hits,
+      misses,
     },
     agents: {
       active: Array.from(activeAgents),

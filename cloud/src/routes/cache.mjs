@@ -3,31 +3,47 @@ import { auth } from '../middleware.mjs';
 
 export const router = Router();
 
+const MAX_VALUE_BYTES = 64 * 1024; // bounds store.json: digests are a few KB
+
+function purgeExpired(tenant) {
+  const now = Date.now();
+  for (const [k, e] of tenant.cache) if (now > e.expires_at) tenant.cache.delete(k);
+}
+
 // Cache set
 router.post('/cache-set', auth, (req, res) => {
   const tenant = req.tenant;
-  const { key, value, ttl = 43200, original_bytes = null } = req.body;
+  const { key, value, ttl = 43200 } = req.body;
+  const originalBytes = Number.isFinite(req.body.original_bytes) ? req.body.original_bytes : null;
 
   if (!key) return res.status(400).json({ error: 'key required' });
 
-  // Enforce plan limits
-  if (tenant.cache.size >= tenant.limits.maxKeys) {
-    return res.status(429).json({
-      error: 'cache limit reached',
-      limit: tenant.limits.maxKeys,
-      plan: tenant.plan,
-      upgrade: tenant.plan === 'free' ? 'Upgrade to Pro for 1000 keys: /api/billing/checkout' : null,
-    });
+  const valueStr = JSON.stringify(value);
+  if (valueStr === undefined) return res.status(400).json({ error: 'value required' });
+  if (valueStr.length > MAX_VALUE_BYTES) {
+    return res.status(413).json({ error: 'value too large (store a digest, not a raw log)', limit: MAX_VALUE_BYTES });
+  }
+
+  // Plan limit applies to NEW keys only; overwriting an existing key never grows the cache.
+  if (!tenant.cache.has(key) && tenant.cache.size >= tenant.limits.maxKeys) {
+    purgeExpired(tenant);
+    if (tenant.cache.size >= tenant.limits.maxKeys) {
+      return res.status(429).json({
+        error: 'cache limit reached',
+        limit: tenant.limits.maxKeys,
+        plan: tenant.plan,
+        upgrade: tenant.plan === 'free' ? 'Upgrade to Pro for 1000 keys: /api/billing/checkout' : null,
+      });
+    }
   }
 
   const effectiveTtl = Math.min(ttl, tenant.limits.maxTtl);
-  const valueStr = JSON.stringify(value);
 
   tenant.cache.set(key, {
     value,
     meta: {
       value_bytes: valueStr.length,
-      original_bytes,
+      original_bytes: originalBytes,
       read_count: 0,
       created_at: new Date().toISOString(),
     },
@@ -46,6 +62,7 @@ router.get('/cache-get/:key', auth, (req, res) => {
 
   if (!entry || Date.now() > entry.expires_at) {
     if (entry) tenant.cache.delete(req.params.key);
+    tenant.stats.totalMisses++;
     return res.json({ error: 'cache miss' });
   }
 

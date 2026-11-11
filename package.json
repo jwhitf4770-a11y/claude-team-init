@@ -29,6 +29,11 @@
     "bin/",
     "src/",
     "skill/",
+    "cloud/src/",
+    "cloud/public/",
+    "cloud/package.json",
+    "cloud/Dockerfile",
+    "cloud/fly.toml",
     "README.md"
   ],
   "repository": {
