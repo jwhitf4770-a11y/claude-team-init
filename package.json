@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "AI agent team bootstrapper for any codebase. One command to set up specialized agents + Fly.io cache.",
   "bin": {
-    "codecrew": "./bin/cli.mjs",
-    "claude-team-init": "./bin/cli.mjs",
-    "cti": "./bin/cli.mjs"
+    "codecrew": "bin/cli.mjs",
+    "claude-team-init": "bin/cli.mjs",
+    "cti": "bin/cli.mjs"
   },
   "type": "module",
   "scripts": {
@@ -38,7 +38,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/jwhitf4770-a11y/claude-team-init"
+    "url": "git+https://github.com/jwhitf4770-a11y/claude-team-init.git"
   },
   "engines": {
     "node": ">=18"
