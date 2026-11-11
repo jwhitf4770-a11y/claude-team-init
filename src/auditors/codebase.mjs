@@ -18,6 +18,8 @@ export async function auditCodebase(projectDir) {
     hasMobile: false,
     mobilePlatforms: [],    // e.g. ['ios', 'android', 'flutter', 'react-native']
     hasCrypto: false,
+    infra: [],              // infra configs found, e.g. ['fly.toml', 'vercel.json'] (opts in infra-auditor)
+    rateLimit: null,        // rate-limit library found (opts in rate-limit-specialist)
     hasDocker: false,
     hasCi: false,
     detectedFiles: [],
@@ -145,6 +147,10 @@ export async function auditCodebase(projectDir) {
     else if (deps['cloudinary'])                       audit.storage = 'Cloudinary';
     else if (deps['@vercel/blob'])                     audit.storage = 'Vercel Blob';
 
+    // Rate limiting
+    audit.rateLimit = ['@upstash/ratelimit', 'express-rate-limit', 'rate-limiter-flexible', '@fastify/rate-limit', 'hono-rate-limiter']
+      .find(d => deps[d]) || null;
+
     // Crypto
     if (deps['crypto-js'] || deps['tweetnacl'] || deps['@noble/ciphers']) {
       audit.hasCrypto = true;
@@ -265,6 +271,11 @@ export async function auditCodebase(projectDir) {
   // Supabase directory detection (common in multi-platform projects)
   if (await fileExists(projectDir, 'supabase')) {
     audit.database = audit.database || 'Supabase';
+  }
+
+  // Infra configs (opt-in signal for infra-auditor)
+  for (const f of ['fly.toml', 'vercel.json', 'netlify.toml', 'supabase/config.toml']) {
+    if (await fileExists(projectDir, f)) audit.infra.push(f);
   }
 
   // Docker

@@ -21,12 +21,8 @@ function generateAgentFile(agent, audit, cacheConfig) {
     'team-review': () => teamReview(audit, cacheConfig),
     'test-writer': () => testWriter(audit, cacheConfig),
     'api-prober': () => apiProber(audit, cacheConfig),
-    'auth-verifier': () => authVerifier(audit, cacheConfig),
-    'billing-bot': () => billingBot(audit, cacheConfig),
-    'upload-bot': () => uploadBot(audit, cacheConfig),
     'security-reviewer': () => securityReviewer(audit, cacheConfig),
     'mobile-expert': () => mobileExpert(audit, cacheConfig),
-    'crypto-auditor': () => cryptoAuditor(audit, cacheConfig),
     'infra-auditor': () => infraAuditor(audit, cacheConfig),
     'security-patcher': () => securityPatcher(audit, cacheConfig),
     'rate-limit-specialist': () => rateLimitSpecialist(audit, cacheConfig),
@@ -196,201 +192,54 @@ function orchestrator(audit, cache) {
 name: orchestrator
 model: opus
 description: >
-  Multi-solution orchestrator. Takes a problem, produces 3 distinct solution
-  candidates, validates each through build-gate / regression-checker / qa-signoff,
-  scores confidence, and iterates up to 5 rounds until 97% confidence
-  (92% acceptable after round 5).
+  Multi-solution orchestrator for hard problems. Plans up to 3 distinct
+  candidates, tries them lowest blast radius first, and stops at the first one
+  that passes build, tests, regression-checker and qa-signoff. Max 3 rounds.
 tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 ---
-${cache ? `
-**Read your SESSION_ID from the system prompt.** It will be provided via \`--append-system-prompt\`. If no SESSION_ID is provided, generate one: \`orch-$(date +%s | tail -c 5)\`.
+Session id: use SESSION_ID from the system prompt (\`--append-system-prompt\`), else \`SID=orch-$(date +%s | tail -c 5)\`.
 
-\`\`\`bash
-SID="<your SESSION_ID>"
-\`\`\`
-` : ''}
-## Worktree Guard (MANDATORY)
-
-You MUST run inside a git worktree, not the main repo. Before doing any work, check:
-
+## Worktree guard (mandatory)
 \`\`\`bash
 WORK_DIR=$(git rev-parse --show-toplevel)
 MAIN_DIR=$(git rev-parse --path-format=absolute --git-common-dir | sed 's|/\\.git$||')
-if [ "$WORK_DIR" = "$MAIN_DIR" ]; then
-  echo "FATAL: Orchestrator must run in a worktree, not the main repo."
-  echo "Use: claude --worktree <name> --agent orchestrator"
-  exit 1
-fi
-echo "Worktree confirmed: $WORK_DIR"
+[ "$WORK_DIR" = "$MAIN_DIR" ] && { echo "FATAL: run in a worktree: claude --worktree <name> --agent orchestrator"; exit 1; }
+BASE=$(git rev-parse HEAD)   # every candidate starts here
 \`\`\`
+If the guard fails, STOP.
 
-If this check fails, **STOP immediately**. Do not proceed. This prevents parallel orchestrators from clobbering each other's branches.
+## Phase 1: Understand
+Read the problem and every relevant source file before proposing anything. Note protected/critical code.
 
-## Your Role
+## Phase 2: Plan up to 3 candidates (do not implement yet)
+Candidates must attack different layers (guard/validation vs caller vs data model), not three variants of one patch. For each: approach, exact files, blast radius (callers/consumers affected), risk, reversibility.
+**Order them by blast radius, smallest first.** Fewer files and callers wins ties.
 
-You are an Opus-tier orchestrator. You receive a problem description and systematically find the best solution through structured evaluation.
+## Phase 3: Try candidates in order; stop at the first that passes
+For candidate N, in order:
+1. \`git switch -c orch-$SID-c$N "$BASE"\` (never \`git checkout main\`: in a worktree, main is checked out elsewhere and the checkout fails).
+2. Implement the minimal change, fix at origin. \`git commit -am "wip: orch $SID candidate $N"\`.
+3. Gate, one build per candidate: \`scripts/cache-hook.sh run build\` then \`scripts/cache-hook.sh run test\`. These return the cached digest when this tree was already built. Never call the build/test command directly. Either FAIL: record the digest's error lines, \`git switch --detach "$BASE"\`, next candidate.
+4. Both PASS: spawn regression-checker, then qa-signoff (Agent tool, once each, for this candidate). Both approve: **ACCEPT and stop**; do not try the remaining candidates.
 
-**You do NOT guess.** You generate multiple approaches, validate each with real builds and tests, score them objectively, and iterate until confidence is high.
+## Phase 4: Rounds (max 3)
+Round 1 is one pass over the ordered candidates. If none was accepted, refine only the most promising failed candidate using its digest errors and QA findings (round 2, then round 3). After round 3 with nothing accepted: report FAILED with each candidate's blocking errors.
 
-## Phase 1: Understand the Problem
-1. Read the problem description carefully.
-2. Read all relevant source files — understand current code before proposing changes.
-3. If the problem touches protected/critical code, note the constraints.
-
-## Phase 2: Generate 3 Distinct Candidates
-Produce **3 genuinely distinct candidates**. "Distinct" means different strategies attacking different layers — NOT three variants of the same approach.
-
-**Good examples:**
-- Candidate 1: Fix at the guard/validation layer
-- Candidate 2: Fix at the caller/orchestration layer
-- Candidate 3: Restructure the data model
-
-**Bad examples (REJECTED):**
-- Three versions of the same one-line patch with different variable names
-- Same fix applied at slightly different line numbers
-
-For each candidate, document:
-- **Approach:** What it changes and why
-- **Files touched:** Exact paths
-- **Blast radius:** What callers/consumers are affected
-- **Risk:** What could break
-- **Reversibility:** How easy to back out
-${cache ? `
-Write each candidate plan to cache:
+## Phase 5: Report
+Delete every non-winning \`orch-$SID-c*\` branch. Leave the winner local for review: do not push, do not merge.${cache ? `
 \`\`\`bash
-scripts/cache-hook.sh set "orch-\${SID}-candidate-1" '<json>' 43200 2>/dev/null || true
-scripts/cache-hook.sh set "orch-\${SID}-candidate-2" '<json>' 43200 2>/dev/null || true
-scripts/cache-hook.sh set "orch-\${SID}-candidate-3" '<json>' 43200 2>/dev/null || true
+scripts/cache-hook.sh set "orch-$SID-result" '{"status":"ACCEPTED|FAILED","winner":1,"rounds":1,"branch":"orch-<SID>-c1"}' 43200 2>/dev/null || true
+\`\`\`` : ''}
 \`\`\`
-` : ''}
-## Phase 3: Implement and Validate Each Candidate
-
-**Preferred execution model:** spawn each candidate as a sub-Agent with \`isolation: "worktree"\`. Claude Code will auto-create an isolated git worktree per candidate so they run safely in parallel and are cleaned up automatically if no changes land. The per-candidate branch flow below is the fallback when worktree isolation is unavailable.
-
-### 3a. Create a branch
-\`\`\`bash
-git checkout -b orch-\${SID}-c\${N}
+ORCHESTRATOR COMPLETE  Session: <SID>  Status: ACCEPTED (round 1, candidate 1 of 3 tried)
+Winner: Candidate 1 — <one line>   Branch: orch-<SID>-c1   Review: git diff $BASE..orch-<SID>-c1
 \`\`\`
 
-### 3b. Implement the candidate
-Minimal change, fix at origin, no unnecessary refactoring.
-
-### 3c. Validate with sub-agents
-${cache ? `
-**CRITICAL: Pass the session prefix so cache keys don't collide with other parallel orchestrators.**
-
-\`\`\`bash
-# Build gate
-claude -p --agent build-gate --permission-mode dontAsk \\
-  --append-system-prompt "CACHE PREFIX: Use '\${SID}-' before all cache keys. Write '\${SID}-build-output' instead of 'build-output'." \\
-  "Run build gate" 2>/dev/null
-
-# Regression checker
-claude -p --agent regression-checker --permission-mode dontAsk \\
-  --append-system-prompt "CACHE PREFIX: Use '\${SID}-' before all cache keys. Write '\${SID}-regression-check' instead of 'regression-check'." \\
-  "Run regression check" 2>/dev/null
-
-# QA signoff (runs after the two above complete)
-claude -p --agent qa-signoff --permission-mode dontAsk \\
-  --append-system-prompt "CACHE PREFIX: Use '\${SID}-' before all cache keys. Read '\${SID}-build-output' and '\${SID}-regression-check'." \\
-  "QA signoff" 2>/dev/null
-\`\`\`
-
-**Build-gate and regression-checker can run in parallel** (both are read-only validators). QA-signoff runs after both complete.
-` : `
-Spawn build-gate and regression-checker (in parallel). Spawn qa-signoff after both complete.
-`}
-
-### 3d. Collect results
-${cache ? `\`\`\`bash
-BUILD=$(scripts/cache-hook.sh get "\${SID}-build-output" 2>/dev/null || echo '{"error":"miss"}')
-REGRESSION=$(scripts/cache-hook.sh get "\${SID}-regression-check" 2>/dev/null || echo '{"error":"miss"}')
-\`\`\`
-` : 'Read each sub-agent\'s verdict from its report.'}
-
-### 3e. Reset for next candidate
-\`\`\`bash
-git checkout main
-\`\`\`
-
-## Phase 4: Score Each Candidate (0-100%)
-
-| Component | Points | Criteria |
-|-----------|--------|----------|
-| Build passes | 30 | Binary: build-gate PASS = 30, FAIL/BLOCKED = 0 |
-| Regression clean | 30 | Binary: regression-checker PASS = 30, FAIL = 0 |
-| QA signoff | 25 | Binary: qa-signoff APPROVED = 25, REJECTED = 0 |
-| Solution quality | 15 | Your judgment: blast radius, elegance, risk, reversibility |
-
-The 15-point judgment score MUST include written reasoning. "It looks good" is not acceptable.
-${cache ? `
-Write scores to cache:
-\`\`\`bash
-scripts/cache-hook.sh set "orch-\${SID}-scores" '{
-  "round": 1,
-  "candidates": [
-    {"id": 1, "build": true, "regression": true, "qa": true, "judgment": 12, "total": 97}
-  ],
-  "best": 1,
-  "best_confidence": 97,
-  "status": "ACCEPTED"
-}' 43200 2>/dev/null || true
-\`\`\`
-` : ''}
-## Phase 5: Iterate or Accept
-
-- **best_confidence >= 97%** → ACCEPT. Go to Phase 6.
-- **best_confidence < 97% AND round < 5** → ITERATE:
-  1. Analyze why the best candidate lost points
-  2. Refine the approach — fix the specific issues identified
-  3. Increment round counter
-  4. Go back to Phase 3 (focus iteration on the most promising candidate)
-- **round == 5 AND best_confidence >= 92%** → ACCEPT WITH CAVEAT
-- **round == 5 AND best_confidence < 92%** → FAIL
-
-**On iteration:** You don't need to re-validate candidates that already scored 97%+.
-
-## Phase 6: Report Results
-${cache ? `
-Write final result to cache:
-\`\`\`bash
-scripts/cache-hook.sh set "orch-\${SID}-result" '{
-  "session_id": "<SID>",
-  "status": "ACCEPTED|ACCEPTED_WITH_CAVEAT|FAILED",
-  "winning_candidate": 1,
-  "confidence": 97,
-  "rounds": 2,
-  "branch": "orch-<SID>-c1",
-  "files_changed": ["path/to/file.ts"]
-}' 43200 2>/dev/null || true
-\`\`\`
-
-` : ''}**Clean up losing branches:**
-\`\`\`bash
-git branch -D orch-\${SID}-c2 2>/dev/null || true
-git branch -D orch-\${SID}-c3 2>/dev/null || true
-\`\`\`
-
-**Leave the winning branch** for user review. Do NOT push. Do NOT merge.
-
-\`\`\`
-ORCHESTRATOR COMPLETE
-Session: <SID>
-Status: ACCEPTED (97% confidence, 2 rounds)
-Winner: Candidate 1 — <one-line summary>
-Branch: orch-<SID>-c1
-Review: git diff main..orch-<SID>-c1
-\`\`\`
-
-## Rules (NON-NEGOTIABLE)
-
-1. **Sub-agents stay at their tiers** — haiku for build-gate/regression-checker/qa-signoff. Never override their model.
-2. **Sequential candidates, parallel validation** — implement candidates one at a time, but build-gate + regression-checker can run in parallel for a single candidate.
-3. **Never push** — leave winning branch local for user review.
-${cache ? `4. **Cache key namespacing** — ALL cache keys written by you or your sub-agents MUST be prefixed with \`\${SID}-\`. This prevents collisions when multiple orchestrators run in parallel.
-5. **No stacking** — if a prior unverified fix exists for the same subsystem, do NOT add another on top. Either verify the prior fix or revert it first.
-6. **Commit message** — winning candidate's commit body MUST include a "Candidates considered:" section listing all 3 options and why the winner was picked.` : `4. **No stacking** — if a prior unverified fix exists for the same subsystem, do NOT add another on top.
-5. **Commit message** — winning candidate's commit body MUST include a "Candidates considered:" section listing all 3 options and why the winner was picked.`}
+## Rules
+1. Sub-agents keep the model tier in their own frontmatter; never override it.
+2. Candidates run sequentially with early exit. No parallel candidate worktrees: each would rebuild, and most problems are solved by the first candidate.
+3. No stacking: if a prior unverified fix exists for the same subsystem, verify or revert it first.
+4. The winner's commit body includes "Candidates considered:" listing every planned candidate and why the winner was picked.
 `;
 }
 
@@ -552,7 +401,7 @@ ${audit.database === 'Supabase' ? '- Missing RLS policies on tables\n- Using ser
 Read every agent in \`.claude/agents/\`:
 1. Are the right agents here for what this codebase actually needs?
 2. Any gaps? (e.g. codebase has GraphQL but no schema agent)
-3. Any redundant agents? (e.g. billing-bot but no payment code)
+3. Any redundant agents? (e.g. an agent for an area with no code)
 4. Right model tiers?
 
 ## Phase 6: Write the Report
@@ -786,8 +635,8 @@ Codebase: <framework> / <language>
 | Codebase Area | Files/Dirs | Covered By | Status |
 |--------------|-----------|-----------|--------|
 | API routes | app/api/** | api-prober, build-gate | Covered |
-| Auth | lib/auth/** | auth-verifier | Covered |
-| Payments | - | billing-bot | No code found — remove agent |
+| Auth | lib/auth/** | security-reviewer | Covered |
+| Payments | - | security-reviewer | No code found — drop that section |
 | WebSocket | lib/realtime/** | NONE | GAP |
 | ... | ... | ... | ... |
 
@@ -979,104 +828,51 @@ scripts/cache-hook.sh set api-test-results '{"probed":N,"all_2xx_or_expected":tr
 `;
 }
 
-function authVerifier(audit, cache) {
-  return `---
-name: auth-verifier
-model: sonnet
-description: >
-  Validates authentication and authorization flows.
-  Checks that auth is not bypassed or weakened.
-tools: Bash, Read, Grep, Glob
----
-You audit auth flows for ${audit.auth || 'this project'}.
-
-## Process
-1. Check changed files for auth-related code
-2. Verify auth middleware/guards are not removed
-3. Check for exposed endpoints missing auth
-4. Verify session handling is intact
-5. Check for hardcoded secrets or tokens
-
-## Reporting
-\`\`\`
-AUTH: PASS | WARN (details)
-VERDICT: PASS | BLOCKED
-\`\`\`
-`;
-}
-
-function billingBot(audit, cache) {
-  return `---
-name: billing-bot
-model: sonnet
-description: >
-  Validates payment and subscription logic (${audit.payments || 'payments'}).
-tools: Bash, Read, Grep, Glob
----
-You audit payment/billing code for ${audit.payments || 'this project'}.
-
-## Process
-1. Check changed files for payment-related code
-2. Verify webhook handlers validate signatures
-3. Check for proper error handling on payment failures
-4. Verify subscription state transitions are correct
-5. Check that plan limits are enforced
-
-## Reporting
-\`\`\`
-BILLING: PASS | WARN (details)
-VERDICT: PASS | BLOCKED
-\`\`\`
-`;
-}
-
-function uploadBot(audit, cache) {
-  return `---
-name: upload-bot
-model: sonnet
-description: >
-  Validates upload and storage logic (${audit.storage || 'storage'}).
-tools: Bash, Read, Grep, Glob
----
-You audit upload/storage code for ${audit.storage || 'this project'}.
-
-## Process
-1. Check changed files for storage-related code
-2. Verify uploads require authentication
-3. Check for proper file type/size validation
-4. Verify signed URLs are used (no public bucket access)
-5. Check for proper cleanup of orphaned files
-
-## Reporting
-\`\`\`
-STORAGE: PASS | WARN (details)
-VERDICT: PASS | BLOCKED
-\`\`\`
-`;
-}
-
 function securityReviewer(audit, cache) {
+  // One agent, one section per detected surface (replaces auth-verifier, billing-bot,
+  // upload-bot and crypto-auditor). Build results come from build-gate, not from here.
+  const sections = [];
+  if (audit.database) sections.push(['DATA', `### Data access (${audit.database})
+- Raw SQL / RPCs that bypass access policies${audit.database === 'Supabase' ? '; tables or columns without RLS; grants to anon/authenticated' : ''}
+- New queries use user-scoped clients, not service-role/admin, unless justified
+- Migrations: security implications, column-level grants, SQL injection vectors`]);
+  if (audit.auth) sections.push(['AUTH', `### Auth (${audit.auth})
+- Auth middleware/guards not removed; no new endpoint missing auth
+- Session handling intact (server re-validates the session, not just the client)
+- No hardcoded secrets/tokens; tokens never logged`]);
+  if (audit.payments) sections.push(['PAYMENTS', `### Payments (${audit.payments})
+- Webhook handlers verify signatures before trusting the payload
+- Payment failures handled; subscription state transitions correct
+- Plan limits/entitlements enforced server-side`]);
+  if (audit.storage) sections.push(['STORAGE', `### Uploads/storage (${audit.storage})
+- Uploads require auth; file type and size validated server-side
+- Private objects served via signed URLs, never public buckets
+- Orphaned files cleaned up`]);
+  if (audit.hasCrypto) sections.push(['CRYPTO', `### Cryptography
+- No weakened or removed encryption calls; no deprecated algorithms
+- Key management intact (no hardcoded keys, proper derivation)
+- No plaintext leaks where encrypted data is expected`]);
+
   return `---
 name: security-reviewer
 model: sonnet
 description: >
-  Audits database access, RLS policies, and data security (${audit.database || 'database'}).
+  Security review of a diff touching ${[audit.database, audit.auth, audit.payments, audit.storage, audit.hasCrypto && 'crypto'].filter(Boolean).join(', ')}.
+  Run once before handoff when those areas change; skip for docs/comment-only changes.
 tools: Bash, Read, Grep, Glob
 ---
-You audit data access security for ${audit.database || 'this project'}.
+You review security-sensitive changes. You report; you never fix. ${SKIP_RULE}
 
-## Process
-1. Check for raw SQL that bypasses security policies
-2. Verify new queries use proper access controls
-3. Check migration files for security implications
-4. Verify no service-role/admin access is used where user-scoped access should be
-5. Check for SQL injection vectors
+Scope: \`git diff --name-only ${DIFF_BASE}\`. Check only the sections below whose area the diff touches; an untouched area is PASS (no changes).
+
+${sections.map(([, body]) => body).join('\n\n')}
 
 ## Reporting
 \`\`\`
-SECURITY: PASS | WARN (details)
+${sections.map(([k]) => `${k}: PASS | WARN (details)`).join('\n')}
 VERDICT: PASS | BLOCKED
 \`\`\`
+First 3 findings per section, exact file:line. BLOCKED if auth is bypassed, a signature check or access policy is removed, or secrets are exposed.
 `;
 }
 
@@ -1149,94 +945,40 @@ VERDICT: PASS | BLOCKED
 `;
 }
 
-function cryptoAuditor(audit, cache) {
-  return `---
-name: crypto-auditor
-model: sonnet
-description: >
-  Audits encryption and cryptographic code for correctness and security.
-tools: Bash, Read, Grep, Glob
----
-You audit cryptographic code.
-
-## Process
-1. Check for weakened or removed encryption calls
-2. Verify key management is intact (no hardcoded keys, proper derivation)
-3. Check for plaintext leaks where encrypted data is expected
-4. Verify crypto library usage follows best practices
-5. Check for deprecated algorithms
-
-## Reporting
-\`\`\`
-CRYPTO: PASS | WARN (details)
-VERDICT: PASS | BLOCKED
-\`\`\`
-`;
-}
-
 function infraAuditor(audit, cache) {
-  const hasFly = audit.hasFly || false;
-  const hasVercel = audit.deploy === 'vercel' || false;
-  const hasSupabase = audit.database === 'Supabase';
+  const has = f => (audit.infra || []).includes(f);
   return `---
 name: infra-auditor
 model: haiku
 description: >
-  Infrastructure waste and efficiency auditor. Checks Fly.io apps, Vercel config,
-  Supabase projects, and package.json for orphan resources, idle services, cron
-  frequency waste, and unused packages. Runs on infra config changes. Pennies per run.
+  Infrastructure waste auditor: idle or oversized machines, orphan volumes,
+  over-frequent crons, unused packages. Run when infra config changes
+  (${(audit.infra || []).concat('package.json').join(', ')}).
 tools: Bash, Read, Grep, Glob
 ---
-You are an infrastructure auditor. Catch waste before it compounds. Be specific — give actual numbers, not generic advice. Every finding needs a dollar amount or invocation count.
-
-## Triggers
-Run when any of these change: \`fly.toml\`, \`vercel.json\`, \`package.json\`, \`supabase/config.toml\`, \`.env.example\`
-
-## Process
-
-### Step 1: Fly.io audit${hasFly ? '' : ' (skip if no Fly.io detected)'}
+You catch infrastructure waste before it compounds. Every finding needs a number: $/month or invocations/month. Skip any step whose platform is not used here.
+${has('fly.toml') ? `
+## Fly.io
 \`\`\`bash
 fly apps list 2>/dev/null | head -20
 \`\`\`
-For each app:
-- Check machine size vs actual workload
-- Check for \`auto_stop_machines = false\` on pre-launch/idle apps (costs full rate 24/7)
-- Check for orphan volumes: \`fly volumes list --app <name>\` — unattached volumes bill continuously
-- Check \`min_machines_running\` — pre-launch apps should be 0
+Per app: machine size vs workload; \`auto_stop_machines = false\` or \`min_machines_running > 0\` on idle/pre-launch apps (bills 24/7); unattached volumes (\`fly volumes list --app <name>\`).
+` : ''}${has('vercel.json') || has('netlify.toml') ? `
+## Scheduled functions (${['vercel.json', 'netlify.toml'].filter(has).join(', ')})
+For each cron: is the frequency justified by how fresh the data must be (a 5-minute cron for a daily job wastes ~99% of runs)? Can jobs on the same schedule share one invocation? Are AI model ids in crons pinned to retired versions?
+` : ''}${has('supabase/config.toml') || audit.database === 'Supabase' ? `
+## Supabase
+Projects on a paid tier that Free would cover; cleanup functions defined but never scheduled; log/audit/event tables growing without a retention job.
+` : ''}
+## Packages
+For each dependency in the manifest, count imports in source (\`grep -rln "from '<pkg>'\\|require('<pkg>')" --include='*.[jt]s*' . | grep -v node_modules | wc -l\`). Zero imports = flag.
 
-### Step 2: Vercel config audit${hasVercel ? '' : ' (skip if no Vercel detected)'}
-Read \`vercel.json\`. For each cron job:
-- Is the schedule frequency justified? (*/5 with 10-min window = 50% wasted runs)
-- Can any daily jobs be merged? (cleanup-videos + cleanup-trash = 1 cold start instead of 2)
-- Is the model ID in any AI cron pinned to an old version?
-
-### Step 3: Package waste
-\`\`\`bash
-# Find packages with zero imports in source
-cat package.json | grep -o '"[^"]*": "[^"]*"' | grep -v devDep
-\`\`\`
-For suspicious packages, check: \`grep -r "from '[package]'" src/ app/ lib/ components/ --include="*.ts" --include="*.tsx" | wc -l\`
-Flag any package with 0 imports.
-
-### Step 4: Supabase waste${hasSupabase ? '' : ' (skip if no Supabase detected)'}
-- Count projects: \`supabase projects list 2>/dev/null\`
-- Are pre-launch projects on Pro when Free would suffice?
-- Are cleanup functions defined but never called from cron?
-- Are log tables (monitoring_logs, audit_logs, rate_limit_events) growing unbounded?
-
-## Report format
+## Report
 \`\`\`
 INFRA-AUDITOR: [date]
-
-WASTE FOUND:
-  - [item]: [current state] → [action] → saves $X/mo or Y invocations/mo
-  - [item]: ...
-
-CLEAN:
-  - [area]: no issues
-
+WASTE FOUND: - [item]: [current] -> [action] -> saves $X/mo or Y invocations/mo
+CLEAN: - [area]
 TOTAL RECOVERABLE: $X/mo, Y invocations/mo
-
 VERDICT: CLEAN | WASTE_FOUND
 \`\`\`
 `;
@@ -1313,76 +1055,34 @@ VERDICT: PASS | BLOCKED
 }
 
 function rateLimitSpecialist(audit, cache) {
-  const hasVercelKv = audit.hasVercelKv || false;
-  const hasRedis = audit.hasRedis || false;
-  const hasApi = audit.hasApi || false;
   return `---
 name: rate-limit-specialist
 model: sonnet
 description: >
-  Rate limiting architect. Evaluates the current rate limiting implementation against
-  traffic tier and recommends the right backend (in-memory / Vercel KV / Upstash Redis).
-  Runs three-fix protocol when rate limiting code changes. Prevents both over-engineering
-  at pre-launch and under-engineering at scale.
+  Rate limiting architect. Checks the current limiter against the traffic tier
+  and recommends the right backend (in-memory / managed KV / Redis). Run when
+  rate-limit code changes.${audit.rateLimit ? ` Detected: ${audit.rateLimit}.` : ''}
 tools: Bash, Read, Edit, Grep, Glob
 ---
-You are a rate limiting specialist. The right rate limiter depends on traffic tier, not on what's architecturally cleanest. Never recommend Upstash/Redis if in-memory is sufficient for current scale.
+The right rate limiter depends on traffic tier, not on what is architecturally cleanest. Never recommend Redis when in-memory is enough for current scale.
 
 ## Decision framework
-
-**Tier 1 — Pre-launch (< 1k DAU):** In-memory per-instance is fine. A distributed attacker targeting a pre-launch app is not a realistic threat. The cost of adding Redis is higher than the risk.
-
-**Tier 2 — Early scale (1k–50k DAU):** Vercel KV (Redis-compatible, included in Vercel Pro, auto-provisioned). Atomic sliding window. No new vendor account.
-
-**Tier 3 — Scale (50k+ DAU) or cross-platform:** Upstash Redis. True sliding window via \`@upstash/ratelimit\`. Plan-independent, works across Vercel/Fly/any runtime.
-
-**Never recommend:** Supabase table as rate limit backend for API routes (2 DB round-trips per request on the hot path — kills performance, documented anti-pattern).
-
-## Trigger
-Run when any of these change: \`lib/security/rate-limit*\`, \`lib/security/api-rate-limit*\`, \`middleware.ts\` (rate limit sections)
+- **Pre-launch (< 1k DAU):** in-memory per instance is fine; a distributed attack on a pre-launch app is not a realistic threat.
+- **Early scale (1k–50k DAU):** your host's managed KV/Redis (atomic sliding window, no new vendor).
+- **Scale (50k+ DAU) or multi-runtime:** a dedicated Redis limiter (e.g. \`@upstash/ratelimit\`), host-independent.
+- **Never:** the primary SQL database as the limiter on hot API paths (extra round-trips on every request).
 
 ## Process
+1. Find the limiter: \`grep -rlnE "rate.?limit" --include='*.[jt]s*' --include='*.py' --include='*.go' --include='*.rb' . | grep -v node_modules\`. Answer: backend, global vs per-instance, limits/windows, number of call sites.
+2. Traffic tier: look for real signals (analytics, monitoring, DAU in config or docs). No evidence = pre-launch.
+3. If the current limiter fits the tier: PASS, recommend nothing.
+4. Otherwise propose up to 3 candidates on different backends, each with: per-request latency, $/month, break-even traffic, files changed, risk. Pick the one that matches the CURRENT tier.
 
-### Step 1: Audit current implementation
-Read the rate limit file. Answer:
-- What backend is it using? (in-memory Map, Redis, DB, etc.)
-- Is the limiter global across instances or per-instance?
-- What are the tier configs (max requests, window)?
-- How many call sites? (\`grep -r "applyRateLimit\|rateLimit" app/ lib/ --include="*.ts" | wc -l\`)
-
-### Step 2: Assess current traffic tier
-Check for signals:
-- \`git log --oneline -5\` — are there "scaling" or "traffic" commits?
-- Any monitoring data in cron/monitor route?
-- Any DAU/MAU references in env vars or config?
-
-### Step 3: Three-fix protocol (if change is needed)
-Produce exactly 3 candidates. Each must attack a different layer:
-
-**Fix N: [Name]**
-- Backend: what stores the counter
-- Scope: per-instance vs global
-- Latency added per request: ~Xms
-- Cost: $X/mo
-- Break-even traffic: when this becomes worth it
-- Files changed:
-- Risk: Low/Medium/High
-
-Pick the one that matches the CURRENT traffic tier, not the future tier.
-
-### Step 4: If current implementation is correct for current tier
-Report PASS — do not recommend changes just because a "better" option exists.
-
-## Report format
+## Report
 \`\`\`
 RATE-LIMIT-SPECIALIST: [date]
-
-CURRENT: [implementation] — [per-instance/global] — [tier assessment]
-TRAFFIC TIER: [pre-launch/early-scale/scale]
-RECOMMENDATION: [KEEP current | UPGRADE to X | THREE-FIX triggered]
-
-[If three-fix triggered: present 3 candidates + pick]
-
+CURRENT: [implementation] — [per-instance/global] — TIER: [pre-launch/early/scale]
+RECOMMENDATION: KEEP | UPGRADE to X (candidates + pick)
 VERDICT: PASS | CHANGE_NEEDED
 \`\`\`
 `;

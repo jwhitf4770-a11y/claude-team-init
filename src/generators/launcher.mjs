@@ -173,8 +173,9 @@ Usage:
   team-launch.sh --cleanup                      Remove orchestrator windows + worktrees
   team-launch.sh --help                         Show this help
 
-Each orchestrator generates 3 solutions, validates each, and iterates
-until 97% confidence (92% acceptable after 5 rounds).
+Each orchestrator plans up to 3 solutions, tries them smallest blast
+radius first, and stops at the first that passes build, tests and QA
+(max 3 rounds).
 USAGE
 }
 
