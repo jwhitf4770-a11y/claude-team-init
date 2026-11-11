@@ -47,45 +47,6 @@ export async function generateHooks(projectDir, audit, agentPlan, cacheConfig) {
     });
   }
 
-  // UserPromptSubmit: inject a short status line (last build + cache health) so the
-  // main session sees up-to-date context without an extra tool call.
-  if (hasCache || buildCmd) {
-    settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit || [];
-    settings.hooks.UserPromptSubmit.push({
-      hooks: [
-        {
-          type: 'command',
-          command: MARK + buildStatusInjection(hasCache),
-        },
-      ],
-    });
-  }
-
-  // SessionStart: show the team roster once per session.
-  settings.hooks.SessionStart = settings.hooks.SessionStart || [];
-  settings.hooks.SessionStart.push({
-    matcher: 'startup|resume',
-    hooks: [
-      {
-        type: 'command',
-        command: MARK + buildSessionStart(agentPlan, hasCache),
-      },
-    ],
-  });
-
-  // Stop: flush a session summary to the cache so the next run has context.
-  if (hasCache) {
-    settings.hooks.Stop = settings.hooks.Stop || [];
-    settings.hooks.Stop.push({
-      hooks: [
-        {
-          type: 'command',
-          command: MARK + `scripts/cache-hook.sh set "last-session-end" "\\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\\"" 86400 2>/dev/null || true`,
-        },
-      ],
-    });
-  }
-
   // PreToolUse: refuse destructive git operations even if permissions slip through.
   settings.hooks.PreToolUse = settings.hooks.PreToolUse || [];
   settings.hooks.PreToolUse.push({
@@ -118,25 +79,6 @@ function buildPostEditCommand(buildCmd, hasCache) {
     `fi`,
     `rm -f "$logfile"`,
   ].join('\n');
-}
-
-function buildStatusInjection(hasCache) {
-  if (!hasCache) {
-    return `echo "[vibe-crew] $(date -u +%H:%MZ)"`;
-  }
-  return [
-    `build=$(scripts/cache-hook.sh get build-output 2>/dev/null | grep -o '"status":"[^"]*"' | head -1 | cut -d'"' -f4)`,
-    `health=$(scripts/cache-hook.sh health 2>/dev/null | head -1)`,
-    `echo "[vibe-crew] build:\${build:-unknown} cache:\${health:-offline}"`,
-  ].join('; ');
-}
-
-function buildSessionStart(agentPlan, hasCache) {
-  const roster = agentPlan.map(a => a.name).join(', ');
-  const cacheLine = hasCache
-    ? ` && scripts/cache-hook.sh health 2>/dev/null || true`
-    : '';
-  return `echo "[vibe-crew] team: ${roster}"${cacheLine}`;
 }
 
 function destructiveGitGuard() {

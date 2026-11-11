@@ -39,7 +39,7 @@ async function main() {
 
   const yesAll = args.includes('--yes') || args.includes('-y');
   let skipCache = args.includes('--no-cache');
-  const skipAudit = args.includes('--no-audit');
+  const skipAudit = args.includes('--no-audit') || yesAll; // -y never starts an unbounded Opus audit
   const dryRun = args.includes('--dry-run');
   // Filter out flags and their values (e.g. --key XXXX)
   const flagsWithValues = ['--key'];
@@ -259,15 +259,15 @@ async function main() {
 function buildAgentPlan(audit) {
   const agents = [
     { name: 'build-gate', model: 'haiku', reason: 'Build + lint verification' },
-    { name: 'qa-signoff', model: 'haiku', reason: 'Final QA with physical proof' },
+    { name: 'qa-signoff', model: 'sonnet', reason: 'Final QA with physical proof' },
     { name: 'regression-checker', model: 'haiku', reason: 'Side effect detection' },
     { name: 'orchestrator', model: 'opus', reason: '3-solution finder with confidence scoring' },
     { name: 'team-audit', model: 'opus', reason: 'Full code audit + auto-fix to 95% confidence' },
-    { name: 'team-review', model: 'opus', reason: 'Fast agent team fitness evaluation' },
+    { name: 'team-review', model: 'sonnet', reason: 'Fast agent team fitness evaluation' },
   ];
 
   if (audit.testCmd) {
-    agents.push({ name: 'test-writer', model: 'haiku', reason: `Test generation (${audit.testRunner || 'detected'})` });
+    agents.push({ name: 'test-writer', model: 'sonnet', reason: `Test generation (${audit.testRunner || 'detected'})` });
   }
   if (audit.hasApi) {
     agents.push({ name: 'api-prober', model: 'haiku', reason: 'API endpoint testing' });
@@ -313,7 +313,7 @@ ${chalk.bold('Usage:')}
   codecrew -y --no-cache       Skip Fly.io, just generate agents
 
 ${chalk.bold('Options:')}
-  -y, --yes       Accept all defaults — no prompts
+  -y, --yes       Accept all defaults — no prompts (implies --no-audit)
   -h, --help      Show this help
   -v, --version   Show version
   --no-cache      Skip Fly.io cache setup

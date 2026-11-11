@@ -104,7 +104,7 @@ function qaSignoff(audit, cache) {
   const testCmd = audit.testCmd || '';
   return `---
 name: qa-signoff
-model: haiku
+model: sonnet
 description: >
   Final QA signoff before handing work back to the user. Requires PHYSICAL PROOF
   that changes work — actual curl responses, test output, query results. Reviews
@@ -804,7 +804,7 @@ scripts/cache-hook.sh set "team-audit-result" "{\\"report\\":\\"TEAM-AUDIT-REPOR
 function teamReview(audit, cache) {
   return `---
 name: team-review
-model: opus
+model: sonnet
 description: >
   Fast agent team evaluation. Reads the codebase and agent definitions,
   identifies coverage gaps, redundancies, and tier mismatches. Does NOT
@@ -954,7 +954,7 @@ function testWriter(audit, cache) {
   const runner = audit.testRunner || 'the project test runner';
   return `---
 name: test-writer
-model: haiku
+model: sonnet
 description: >
   Writes focused tests for new features and bug fixes.
   Covers happy path, edge cases, and failure paths. Also acts as the
