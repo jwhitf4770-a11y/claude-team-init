@@ -11,8 +11,6 @@ export async function generateLauncher(projectDir, audit, cacheConfig) {
 }
 
 function generateLauncherScript(projectDir, cacheConfig) {
-  const cacheUrl = cacheConfig?.url || '';
-  const cacheToken = cacheConfig?.token || '';
   const hookCmd = cacheConfig ? 'scripts/cache-hook.sh' : '';
 
   return `#!/bin/bash
@@ -26,8 +24,7 @@ TMUX_SESSION="agents"
 WINDOW_OFFSET=10
 MONITOR_INTERVAL=30
 ${cacheConfig ? `CACHE_HOOK="$REPO/scripts/cache-hook.sh"
-FLYIO_URL="${cacheUrl}"
-FLYIO_TOKEN="${cacheToken}"` : ''}
+[ -f "$REPO/.claude/.cache-env" ] && . "$REPO/.claude/.cache-env"` : ''}
 
 RED='\\033[0;31m'; GREEN='\\033[0;32m'; YELLOW='\\033[1;33m'
 CYAN='\\033[0;36m'; BOLD='\\033[1m'; NC='\\033[0m'

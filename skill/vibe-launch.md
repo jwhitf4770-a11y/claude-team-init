@@ -14,18 +14,18 @@ The user types `/vibe-launch <problem>` or just `/vibe-launch` and you ask what 
 
 ## What to do
 
-1. Check that `scripts/vibe-launch.sh` exists
-2. If it does: run `./scripts/vibe-launch.sh "<problem>"` 
-3. If multiple problems: run `./scripts/vibe-launch.sh "<problem1>" "<problem2>"`
+1. Check that `scripts/team-launch.sh` exists
+2. If it does: run `./scripts/team-launch.sh "<problem>"` 
+3. If multiple problems: run `./scripts/team-launch.sh "<problem1>" "<problem2>"`
 4. If it doesn't: tell the user to run `/vibe-init` first
 
 ## Monitor mode
 
-If the user says "monitor" or "status": run `./scripts/vibe-launch.sh --monitor`
+If the user says "monitor" or "status": run `./scripts/team-launch.sh --monitor`
 
 ## Cleanup
 
-If the user says "cleanup" or "stop": run `./scripts/vibe-launch.sh --cleanup`
+If the user says "cleanup" or "stop": run `./scripts/team-launch.sh --cleanup`
 
 ## If no scripts exist
 

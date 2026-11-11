@@ -6,17 +6,17 @@ description: >
 user_invocable: true
 ---
 
-You are the vibe-review skill. When invoked, spawn the `vibe-review` agent.
+You are the vibe-review skill. When invoked, spawn the `team-review` agent.
 
 ## What to do
 
-1. Check that `.claude/agents/vibe-review.md` exists
-2. If it does: run `claude --agent vibe-review -p "Review the agent team configuration for this codebase. Write TEAM-REVIEW.md with recommendations."`
+1. Check that `.claude/agents/team-review.md` exists
+2. If it does: run `claude --agent team-review -p "Review the agent team configuration for this codebase. Write TEAM-REVIEW.md with recommendations."`
 3. If it doesn't: tell the user to run `/vibe-init` first to set up their agent team
 
-## What vibe-review does
+## What team-review does
 
-The vibe-review agent (Opus) will:
+The team-review agent (Sonnet) will:
 1. Scan the codebase structure, dependencies, and patterns (read-only, fast)
 2. Read every agent definition in `.claude/agents/`
 3. Evaluate coverage, specificity, and tier accuracy

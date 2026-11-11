@@ -13,7 +13,7 @@ You are the vibe-crew help skill. When invoked, display the guide below exactly 
 Vibe Crew — Your AI engineering team
 
 FIRST TIME SETUP (do this once per project):
-  npx vibe-crew -y          Scans your code, generates agents, deploys cache
+  npx claude-team-init -y         Scans your code, generates agents, deploys cache
 
 WHAT HAPPENS AUTOMATICALLY (you don't need to do anything):
   - Every time you edit a file → build-gate checks it compiles
@@ -21,7 +21,7 @@ WHAT HAPPENS AUTOMATICALLY (you don't need to do anything):
   - Touch auth code → auth-verifier activates
   - Touch payment code → billing-bot activates
   - Touch database code → security-reviewer activates
-  These are configured in .claude/settings.local.json and .claude/rules.json
+  These are configured in .claude/settings.local.json
 
 COMMANDS YOU RUN YOURSELF:
   /vibe-audit     "My code feels messy" — finds dead code, duplication,

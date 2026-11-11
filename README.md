@@ -188,7 +188,6 @@ your-project/
   .claude/
     agents/           # 6-12 agents tailored to your stack
     settings.local.json  # Permissions + auto-trigger hooks
-    rules.json        # Agent activation rules
   scripts/
     team-launch.sh    # Parallel orchestrator launcher
     cache-hook.sh     # Fly.io cache integration

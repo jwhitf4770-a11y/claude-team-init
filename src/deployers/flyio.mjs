@@ -111,7 +111,7 @@ export async function deployFlyio(projectDir, audit, { yesAll = false } = {}) {
     }, null, 2));
 
     // server.mjs
-    await writeFile(join(serverDir, 'server.mjs'), generateServerCode(token));
+    await writeFile(join(serverDir, 'server.mjs'), generateServerCode());
 
     // Dockerfile
     await writeFile(join(serverDir, 'Dockerfile'), `FROM node:20-slim
@@ -163,7 +163,7 @@ primary_region = "ord"
 
   if (!deploy) {
     console.log(chalk.gray(`  Server files saved to ${serverDir}`));
-    console.log(chalk.gray('  Deploy manually: cd .agent-cache-server && fly launch'));
+    console.log(chalk.gray('  Deploy manually: cd .agent-cache-server && fly launch --no-deploy && fly secrets set MCP_TOKEN=<token in .claude/.cache-env> && fly deploy'));
     return { url: `https://${appName}.fly.dev`, token, serverDir, deployed: false };
   }
 
@@ -173,6 +173,9 @@ primary_region = "ord"
     execSync(`cd "${serverDir}" && flyctl launch --name ${appName} --region ord --no-deploy --yes`, {
       stdio: 'pipe',
     });
+
+    // token lives in a Fly secret, not in the generated server files
+    execSync(`cd "${serverDir}" && flyctl secrets set MCP_TOKEN=${token} --stage`, { stdio: 'pipe' });
 
     execSync(`cd "${serverDir}" && flyctl deploy`, {
       stdio: 'pipe',
@@ -211,13 +214,14 @@ primary_region = "ord"
   return config;
 }
 
-function generateServerCode(token) {
+function generateServerCode() {
   return `import express from 'express';
 import bodyParser from 'body-parser';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const AUTH_TOKEN = process.env.MCP_TOKEN || '${token}';
+const AUTH_TOKEN = process.env.MCP_TOKEN;
+if (!AUTH_TOKEN) { console.error('MCP_TOKEN not set (fly secrets set MCP_TOKEN=...)'); process.exit(1); }
 
 app.use(bodyParser.json({ limit: '10mb' }));
 
