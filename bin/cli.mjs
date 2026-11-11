@@ -126,7 +126,7 @@ async function main() {
     }
     console.log(`    ${chalk.gray('.claude/settings.local.json')}`);
     console.log(`    ${chalk.gray('scripts/team-launch.sh')}`);
-    if (!skipCache) console.log(`    ${chalk.gray('scripts/cache-hook.sh')}`);
+    console.log(`    ${chalk.gray('scripts/cache-hook.sh')}`);
     console.log(`    ${chalk.gray('CLAUDE.md')}`);
     console.log('');
     process.exit(0);
@@ -178,7 +178,7 @@ async function main() {
   try {
     await generateAgents(projectDir, agentPlan, audit, cacheConfig);
     genSpinner.text = 'Generating cache hook...';
-    await generateCachehook(projectDir, cacheConfig);
+    await generateCachehook(projectDir, audit, cacheConfig);
     genSpinner.text = 'Generating team launcher...';
     await generateLauncher(projectDir, audit, cacheConfig);
     genSpinner.text = 'Generating CLAUDE.md...';

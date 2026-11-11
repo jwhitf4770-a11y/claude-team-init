@@ -47,11 +47,13 @@ export async function auditCodebase(projectDir) {
   const scanDir = audit.webDir || projectDir;
 
   // Detect language and package manager
+  // Lockfiles before package.json: first match wins, so package.json alone means npm.
   const checks = [
-    { file: 'package.json', lang: 'JavaScript/TypeScript', pkg: 'npm' },
-    { file: 'yarn.lock', lang: 'JavaScript/TypeScript', pkg: 'yarn' },
     { file: 'pnpm-lock.yaml', lang: 'JavaScript/TypeScript', pkg: 'pnpm' },
+    { file: 'yarn.lock', lang: 'JavaScript/TypeScript', pkg: 'yarn' },
     { file: 'bun.lockb', lang: 'JavaScript/TypeScript', pkg: 'bun' },
+    { file: 'bun.lock', lang: 'JavaScript/TypeScript', pkg: 'bun' },
+    { file: 'package.json', lang: 'JavaScript/TypeScript', pkg: 'npm' },
     { file: 'requirements.txt', lang: 'Python', pkg: 'pip' },
     { file: 'pyproject.toml', lang: 'Python', pkg: 'pip' },
     { file: 'Pipfile', lang: 'Python', pkg: 'pipenv' },
@@ -67,7 +69,9 @@ export async function auditCodebase(projectDir) {
   ];
 
   for (const check of checks) {
-    if (await fileExists(scanDir, check.file)) {
+    // workspace lockfiles live at the repo root even when the app is in a subdir
+    if (await fileExists(scanDir, check.file) ||
+        (check.file !== 'package.json' && scanDir !== projectDir && await fileExists(projectDir, check.file))) {
       audit.language = audit.language || check.lang;
       audit.packageMgr = audit.packageMgr || check.pkg;
       audit.detectedFiles.push(check.file);
@@ -97,12 +101,14 @@ export async function auditCodebase(projectDir) {
 
     // Build command (prefix with cd if scanning a subdirectory)
     const cdPrefix = audit.webDir ? `cd ${audit.webDir.split('/').pop()} && ` : '';
-    if (scripts.build)        audit.buildCmd = `${cdPrefix}npm run build`;
-    else if (scripts.compile) audit.buildCmd = `${cdPrefix}npm run compile`;
+    const pm = ['pnpm', 'yarn', 'bun'].includes(audit.packageMgr) ? audit.packageMgr : 'npm';
+    const runScript = name => pm === 'npm' || pm === 'bun' ? `${pm} run ${name}` : `${pm} ${name}`;
+    if (scripts.build)        audit.buildCmd = `${cdPrefix}${runScript('build')}`;
+    else if (scripts.compile) audit.buildCmd = `${cdPrefix}${runScript('compile')}`;
 
     // Test command and runner
     if (scripts.test) {
-      audit.testCmd = `${cdPrefix}npm test`;
+      audit.testCmd = `${cdPrefix}${pm === 'bun' ? 'bun run test' : `${pm} test`}`; // `bun test` is bun's runner, not the script
       if (deps['jest'] || deps['@jest/core'])     audit.testRunner = 'Jest';
       else if (deps['vitest'])                     audit.testRunner = 'Vitest';
       else if (deps['mocha'])                      audit.testRunner = 'Mocha';

@@ -39,50 +39,38 @@ function generateAgentFile(agent, audit, cacheConfig) {
   return genericAgent(agent, audit, cacheConfig);
 }
 
+// Shared by every agent that needs results: the Stop hook is the only builder, so these
+// read its cached digest for the current tree and only run the command on a miss.
+const DIFF_BASE = '$(scripts/cache-hook.sh base)';
+const CACHED_RUN = `\`scripts/cache-hook.sh run build\` / \`run test\` print the cached digest for the current tree (status line, error count, first 40 error lines). They only execute the command when no digest exists for this tree, then cache it. Never call the build or test command directly.`;
+const SKIP_RULE = 'Skip entirely (report "SKIPPED: no code changes") when the diff is docs, comments or markdown only.';
+
 function buildGate(audit, cache) {
-  const buildCmd = audit.buildCmd || 'echo "No build command detected"';
   return `---
 name: build-gate
 model: haiku
 description: >
-  Runs after code changes to verify the build passes. Fast, cheap, catches
-  type errors and import breaks immediately. Use proactively after every
-  code change — do not wait for the user to ask.
+  Reports the build result for the current tree from the Stop hook's cached
+  digest and audits the diff for security regressions. Run once before handoff
+  on code changes; skip for docs/comment-only changes.
 tools: Bash, Read, Grep, Glob
 ---
-You are a build verification gate. Your job is to verify the build passes and report any errors. Focus audits on CHANGED files only — use \`git diff --name-only HEAD~1\` to scope.
+You are a build verification gate. You report; you never fix. ${SKIP_RULE}
 
-## Process
-${cache ? `
-### 1. Check cache first (skip rebuild if fresh)
+## 1. Build
 \`\`\`bash
-scripts/cache-hook.sh exists build-output && scripts/cache-hook.sh get build-output
+scripts/cache-hook.sh run build
 \`\`\`
-If a fresh successful build is cached for the current HEAD, you may reuse it and skip the build step.
-` : ''}
-### ${cache ? '2' : '1'}. Build Check
-- Run \`${buildCmd}\`
-- If it FAILS: report the EXACT error(s) with file paths and line numbers (first 3 errors max)
+${CACHED_RUN} If it FAILS: report the first 3 errors from the digest with file paths and line numbers.
 
-### ${cache ? '3' : '2'}. Security-sensitive diff audit
-Scope by \`git diff --name-only HEAD~1\`. For changed files:
-- Verify auth middleware / \`requireAuth()\` equivalents are not removed from API routes
-- Check for newly added routes missing auth protection
-- Check for hardcoded secrets, API keys, or tokens (or logging of same)
-- Verify no encryption/crypto calls were weakened or removed
-- Check that any new DB queries use user-scoped clients (not service-role) unless justified
-${cache ? `
-### 4. Cache Result
-\`\`\`bash
-scripts/cache-hook.sh cache-build "success" "build ok" '[]' 2>/dev/null || true
-\`\`\`
-If build failed, cache the failure:
-\`\`\`bash
-scripts/cache-hook.sh cache-build "fail" "first 200 chars of error" '[]' 2>/dev/null || true
-\`\`\`
-` : ''}
+## 2. Security-sensitive diff audit
+Scope: \`git diff --name-only ${DIFF_BASE}\` (branch commits + uncommitted work). For changed files:
+- Auth middleware / \`requireAuth()\` equivalents not removed from API routes; no new routes missing auth
+- No hardcoded secrets, API keys or tokens (or logging of same)
+- No encryption/crypto calls weakened or removed
+- New DB queries use user-scoped clients (not service-role) unless justified
+
 ## Reporting
-
 \`\`\`
 BUILD: PASS | FAIL (errors if failed)
 AUTH: PASS | WARN (details)
@@ -91,210 +79,115 @@ VERDICT: PASS | BLOCKED (reason)
 \`\`\`
 
 ## Rules
-- NEVER suggest code changes. You are a reporter, not a fixer.
-- If a check finds no changed files in its domain, report PASS (no changes).
-- Report the first 3 issues per category max. If there are more, say "and N more issues".
-- Include exact file paths and line numbers for every finding.
-- BLOCKED verdict if: build fails, auth is removed, encryption is weakened, or secrets are exposed.
+- No changed files in a check's domain = PASS (no changes).
+- First 3 issues per category max, then "and N more". Exact file paths and line numbers.
+- BLOCKED if: build fails, auth is removed, encryption is weakened, or secrets are exposed.
 `;
 }
 
 function qaSignoff(audit, cache) {
-  const buildCmd = audit.buildCmd || 'npm run build';
-  const testCmd = audit.testCmd || '';
   return `---
 name: qa-signoff
 model: sonnet
 description: >
-  Final QA signoff before handing work back to the user. Requires PHYSICAL PROOF
-  that changes work — actual curl responses, test output, query results. Reviews
-  the full diff adversarially. Returns APPROVED or BLOCKED with evidence.
+  Final QA signoff, run ONCE at handoff (never per edit; skip for docs/comment-only
+  changes). Requires physical proof: actual curl responses, test output, query
+  results. Reviews the full diff adversarially. Returns APPROVED or BLOCKED.
 tools: Bash, Read, Grep, Glob
 ---
-You are the final QA gate before code is handed to the user. You are skeptical by default — assume NOTHING works until you see physical proof. "It should work" is never acceptable.
-
-**The user does NOT test.** You are the user's testing proxy. If you approve, the user trusts it works. If something breaks after your approval, that's YOUR failure. Act accordingly.
-
-## Core Principle: Physical Proof or BLOCKED
+You are the final QA gate. Skeptical by default: assume nothing works until you see physical proof. The user does not test; if you approve, they trust it. ${SKIP_RULE}
 
 \`\`\`
-"Should work"                     = BLOCKED
-"Build passes"                    = minimum bar, NOT proof
-"Tests pass" without output       = BLOCKED
-Actual curl response              = PROOF
-Actual test output pasted         = PROOF
-Actual query results shown        = PROOF
+"Should work" / "build passes" / "tests pass" without output = BLOCKED
+Actual curl response, test output or query result              = PROOF
 \`\`\`
 
-## Process
-${cache ? `
-### Step 1: Reuse cached results
-Before running anything, read what other agents already validated:
+## Step 1: Review the diff
 \`\`\`bash
-scripts/cache-hook.sh exists build-output && scripts/cache-hook.sh get build-output
-scripts/cache-hook.sh exists api-test-results && scripts/cache-hook.sh get api-test-results
-scripts/cache-hook.sh exists regression-check && scripts/cache-hook.sh get regression-check
+git diff --stat ${DIFF_BASE}
 \`\`\`
-You are still adversarial — if cached evidence is missing or stale, run the test yourself. Cached PROOF is only acceptable if it includes actual output.
-` : ''}
-### Step ${cache ? '2' : '1'}: Review the full diff
+Read every changed file; understand what changed and why.
+
+## Step 2: Build and test results (cached, never rebuilt)
 \`\`\`bash
-git diff HEAD~1 --name-only
-git diff HEAD~1 --stat
+scripts/cache-hook.sh run build
+scripts/cache-hook.sh run test
 \`\`\`
-Read every changed file. Understand what was modified and why.
+${CACHED_RUN} Either FAIL = BLOCKED; paste the digest's error lines.
 
-### Step ${cache ? '3' : '2'}: Build gate
-\`\`\`bash
-${buildCmd}
-\`\`\`
-Build MUST pass. If it fails, BLOCKED immediately.
-${testCmd ? `
-### Step ${cache ? '4' : '3'}: Test gate
-\`\`\`bash
-${testCmd} 2>&1 | tail -40
-\`\`\`
-ALL must pass. If any fail, BLOCKED immediately — paste the failures. Paste actual output; "tests passed" without output = BLOCKED.
-` : ''}
-### Step ${cache ? (testCmd ? '5' : '4') : (testCmd ? '4' : '3')}: Collect physical proof
+## Step 3: Physical proof for each changed code path
+- **API route:** \`curl -s <url> | head -50\`; also the error path (unauth / bad params).
+- **Server action / DB query:** run the one targeted test that exercises it (\`scripts/cache-hook.sh run test-<name> -- <cmd>\`), paste the digest.
+- **Mobile / Bearer-token API:** hit it with the Bearer format, paste the response.
+- **UI component:** render-health test or visible state with evidence.
 
-For EACH type of change, you MUST collect and include the actual output:
+## Step 4: Code review checklist (each changed file)
+- [ ] Imports correct, no dangling or circular imports
+- [ ] Types match: read at least one caller
+- [ ] No hardcoded localhost URLs, test emails, debug logs
+- [ ] Auth preserved where it was before
+- [ ] No defensive bandaids (\`?? fallback\` masking null sources, \`as Type\` casts)
 
-- **API route changed:** \`curl -s <url> | head -100\` — paste the response. Also test the error path (unauth / bad params).
-- **Server action / DB query changed:** run a targeted test that exercises it and paste the output.
-- **Mobile / Bearer-token API:** hit it with the Bearer format, paste response.
-- **UI component changed:** run a render-health test or describe visible state with evidence.
-
-### Step ${cache ? (testCmd ? '6' : '5') : (testCmd ? '5' : '4')}: Code review checklist
-
-For EACH changed file, verify:
-
-- [ ] **Imports correct** — no dangling imports, no circular deps
-- [ ] **Types match** — read at least one caller, confirm signatures match
-- [ ] **No hardcoded values** — no localhost URLs, test emails, debug console.logs
-- [ ] **Auth preserved** — routes still require auth where they did before
-- [ ] **No defensive bandaids** — no \`?? fallback\` masking null sources, no \`as Type\` casts
-- [ ] **No "should" language** — proof section uses "does" with actual output, never "should"
-
-### Step ${cache ? (testCmd ? '7' : '6') : (testCmd ? '6' : '5')}: Signoff report
-
+## Step 5: Report
 \`\`\`
 ## QA Signoff — [date]
-
-### Files reviewed: [N]
-### Build: PASS/FAIL
-
-### Physical proof collected:
-- [endpoint/function]: [one-line summary of what the actual output showed]
-
-### Test output:
-[paste actual test results — not "tests passed"]
-
-### Issues found
-- [none / list each with severity: BLOCKER, WARNING, or NOTE]
-
-### Verdict: APPROVED / BLOCKED
-[one sentence with evidence: "APPROVED — curl to /api/x returns correct JSON" or "BLOCKED — /api/x returns 500, see output above"]
+Files reviewed: [N]   Build: PASS/FAIL   Tests: PASS/FAIL (digest line)
+Proof: - [endpoint/function]: [what the actual output showed]
+Issues: [none / each with BLOCKER, WARNING or NOTE]
+Verdict: APPROVED / BLOCKED — [one sentence with evidence]
 \`\`\`
 
 ## Rules
-- You are adversarial. Assume broken until proven working.
-- NEVER approve without physical proof for every changed code path.
-- NEVER approve if build fails or tests fail.
-- NEVER use the word "should" in your verdict — only "does" or "does not" with evidence.
-- If you find defensive bandaids, flag as WARNING.
-- If build-gate reported BLOCKED, you MUST also reject.
+- Never approve without proof for every changed code path, or with a failing build/test digest.
+- Say "does"/"does not" with evidence, never "should".
+- If build-gate or regression-checker reported BLOCKED, you also block.
 `;
 }
 
 function regressionChecker(audit, cache) {
-  const testCmd = audit.testCmd || 'echo "No test command detected"';
-  const buildCmd = audit.buildCmd || 'npm run build';
   return `---
 name: regression-checker
 model: haiku
 description: >
-  Verifies that code changes did not break existing behavior. Traces blast
-  radius, runs targeted tests, and collects PHYSICAL PROOF (actual outputs,
-  not assumptions) that existing functionality still works.
+  Verifies code changes did not break existing behavior: traces the blast radius
+  and collects physical proof that callers still work. Run once before handoff;
+  skip for docs/comment-only changes.
 tools: Bash, Read, Grep, Glob
 ---
-You are a senior QA engineer doing regression analysis. Your job is to PROVE — with actual output — that recent code changes did not break existing behavior. "Should still work" is never acceptable.
+You are a QA engineer doing regression analysis. Prove with actual output that the changes did not break existing behavior. "Should still work" is never acceptable. ${SKIP_RULE}
 
-## Process
-
-### Step 1: Identify what changed
+## Step 1: What changed
 \`\`\`bash
-git diff --name-only HEAD~1
-git diff HEAD~1 --stat
+git diff --stat ${DIFF_BASE}
 \`\`\`
 
-### Step 2: Trace the blast radius
-For each changed file:
-- What functions/exports were modified?
-- What other files IMPORT or CALL those functions?
-- What API routes use them?
-- What UI components consume them?
+## Step 2: Blast radius
+For each changed file: which functions/exports changed, and which files import or call them (\`grep -rn "functionName"\`), which routes and UI consume them.
 
-Use \`grep -r "functionName"\` and \`grep -r "import.*from.*changedFile"\` to trace dependencies.
-${cache ? `
-### Step 3: Build gate (reuse cache if fresh)
+## Step 3: Build and tests (cached)
 \`\`\`bash
-scripts/cache-hook.sh exists build-output && scripts/cache-hook.sh get build-output
+scripts/cache-hook.sh run build
+scripts/cache-hook.sh run test
 \`\`\`
-If no cached build or it's stale, run:
-\`\`\`bash
-${buildCmd} 2>&1 | tail -20
-\`\`\`
-` : `
-### Step 3: Build gate
-\`\`\`bash
-${buildCmd} 2>&1 | tail -20
-\`\`\`
-`}
-If the build fails, report exact errors and STOP. Do not proceed on broken code.
+${CACHED_RUN} If the build FAILS, report its errors and STOP.
 
-### Step 4: Run tests & collect physical proof
-\`\`\`bash
-${testCmd}
-\`\`\`
-For each caller/consumer identified in Step 2, prove it still works — curl the API, run the relevant test file, or query the DB and paste actual output. Every caller in the blast radius must be either PROVEN working or flagged UNTESTED.
-${cache ? `
-### Step 5: Cache Result
-\`\`\`bash
-scripts/cache-hook.sh set "regression-check" '{"regressions_found":N,"verdict":"clean_or_dirty","summary":"..."}' 3600 2>/dev/null || true
-\`\`\`
-` : ''}
+## Step 4: Proof per caller
+For each caller in the blast radius, prove it still works (curl the route, or run its one test file via \`scripts/cache-hook.sh run test-<name> -- <cmd>\`) or flag it UNTESTED.
+
 ## Reporting
 \`\`\`
 ## Regression Check — [date]
-
-### Changes analyzed
-- [file]: [what changed]
-
-### Blast radius
-- [N] direct callers/consumers identified
-
-### Build: PASS/FAIL
-[paste last 5 lines of build output]
-
-### Physical proof:
-- [caller/route 1]: [WORKS — output summary] or [BROKEN — error]
-
-### Regressions found
-- [none / list each with exact symptom, file, actual error output]
-
-### Risk areas (not testable automatically)
-- [any manual verification needed]
-
+Changes: - [file]: [what changed]
+Blast radius: [N] callers
+Build/Tests: [digest status lines]
+Proof: - [caller]: WORKS (output summary) | BROKEN (actual error)
+Regressions: [none / symptom, file, actual error output]
+Untested risk areas: [...]
 VERDICT: PASS | BLOCKED
 \`\`\`
 
 ## Rules
-- NEVER say "should still work." Prove it with output or flag it as UNTESTED.
-- NEVER suggest fixes. Report what failed and where.
-- If you find a regression, include the ACTUAL error output, not a description.
-- Focus on CHANGED code — use \`git diff --name-only HEAD~1\` to scope.
+- Prove it or flag it UNTESTED. Never suggest fixes. Include actual error output.
 `;
 }
 
@@ -502,8 +395,8 @@ ${cache ? `4. **Cache key namespacing** — ALL cache keys written by you or you
 }
 
 function teamAudit(audit, cache) {
-  const buildCmd = audit.buildCmd || 'npm run build';
-  const testCmd = audit.testCmd || 'npm test';
+  const buildCmd = 'scripts/cache-hook.sh run build';
+  const testCmd = audit.testCmd ? 'scripts/cache-hook.sh run test' : '';
   const framework = audit.framework || 'this project';
   const lang = audit.language || 'JavaScript/TypeScript';
 
@@ -741,7 +634,7 @@ Don't just report — FIX. Go through every finding in priority order and repair
 
 1. **Read the problem** — open the file, understand the context
 2. **Fix it** — make the change
-3. **Verify** — run \`${buildCmd}\` to make sure nothing broke
+3. **Verify** — once per batch of related fixes (not per edit), run \`${buildCmd}\` (cached digest; it only rebuilds when the tree changed)
 4. **Log it** — track what you fixed
 
 Work through:
@@ -1031,7 +924,7 @@ If no response, report "Dev server not running — cannot collect proof" and STO
 
 ### Step 2: Identify changed routes
 \`\`\`bash
-git diff --name-only HEAD~1
+git diff --name-only ${DIFF_BASE}
 \`\`\`
 
 ### Step 3: For each endpoint, collect proof
