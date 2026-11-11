@@ -67,9 +67,13 @@ rcurl() { curl -s --connect-timeout 3 --max-time 5 -H "Authorization: Bearer $FL
 remote_get() { # key -> sets HIT. Not run in a subshell, so REMOTE_DOWN sticks for the later write.
   remote_on || return 1
   local r code b64
-  r=$(rcurl -w '\n%{http_code}' "$FLYIO_URL/mcp/cache-get/$1") || { REMOTE_DOWN=1; return 1; }
+  r=$(rcurl -w '\n%{http_code}' "$FLYIO_URL/mcp/cache-get/$1")
   code=${r##*$'\n'}
-  [ "$code" = 200 ] || { REMOTE_DOWN=1; return 1; } # stale token / server error: stop talking to it
+  if [ "$code" != 200 ]; then # unreachable / stale token / server error: stop talking to it
+    REMOTE_DOWN=1
+    echo "vibe-crew: remote cache unavailable (HTTP ${code:-none}); running locally" >&2
+    return 1
+  fi
   b64=$(printf '%s' "${r%$'\n'*}" | sed -n 's/.*"b64":"\([A-Za-z0-9+/=]*\)".*/\1/p')
   [ -n "$b64" ] || return 1
   HIT=$(printf '%s' "$b64" | base64 -d 2>/dev/null) && [ -n "$HIT" ]

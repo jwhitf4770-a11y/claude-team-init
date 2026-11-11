@@ -3,6 +3,15 @@ primary_region = "ord"
 
 [build]
 
+[env]
+  DATA_DIR = "/data"
+
+# Machines auto-stop when idle; the store survives on this volume.
+# Create once before the first deploy: fly volumes create cache_data --size 1 --region ord
+[mounts]
+  source = "cache_data"
+  destination = "/data"
+
 [http_service]
   internal_port = 8080
   force_https = true

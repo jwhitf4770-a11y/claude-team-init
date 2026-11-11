@@ -1,10 +1,23 @@
 import { execSync } from 'child_process';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { writeFile, mkdir, readFile, cp } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
+
+// ONE server source: the self-hosted cache is a copy of cloud/ (MCP_TOKEN = single-tenant mode).
+const CLOUD_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'cloud');
+
+export async function writeCacheServer(serverDir, appName) {
+  await mkdir(serverDir, { recursive: true });
+  for (const f of ['src', 'public', 'package.json', 'Dockerfile']) {
+    await cp(join(CLOUD_DIR, f), join(serverDir, f), { recursive: true });
+  }
+  const flyToml = await readFile(join(CLOUD_DIR, 'fly.toml'), 'utf-8');
+  await writeFile(join(serverDir, 'fly.toml'), flyToml.replace(/^app = .*$/m, `app = "${appName}"`));
+}
 
 export async function deployFlyio(projectDir, audit, { yesAll = false } = {}) {
   const projectName = projectDir.split('/').pop().toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -13,9 +26,9 @@ export async function deployFlyio(projectDir, audit, { yesAll = false } = {}) {
 
   console.log('');
   console.log(chalk.bold('  Fly.io Cache Server Setup'));
-  console.log(chalk.gray('  A tiny Express server that caches build/test results'));
+  console.log(chalk.gray('  A tiny Express server (cloud/, single-tenant) that caches build/test digests'));
   console.log(chalk.gray('  so your agents don\'t repeat each other\'s work.'));
-  console.log(chalk.gray('  Cost: ~$3/month (shared-cpu-1x, 256MB)'));
+  console.log(chalk.gray('  Cost: ~$3/month (shared-cpu-1x, 256MB, 1GB volume)'));
   console.log('');
 
   // Check if flyctl is installed
@@ -99,49 +112,7 @@ export async function deployFlyio(projectDir, audit, { yesAll = false } = {}) {
   const spinner = ora('Generating cache server...').start();
 
   try {
-    await mkdir(serverDir, { recursive: true });
-
-    // package.json
-    await writeFile(join(serverDir, 'package.json'), JSON.stringify({
-      name: appName,
-      version: '1.0.0',
-      private: true,
-      scripts: { start: 'node server.mjs' },
-      dependencies: { express: '^4.18.0', 'body-parser': '^1.20.0' },
-    }, null, 2));
-
-    // server.mjs
-    await writeFile(join(serverDir, 'server.mjs'), generateServerCode());
-
-    // Dockerfile
-    await writeFile(join(serverDir, 'Dockerfile'), `FROM node:20-slim
-WORKDIR /app
-COPY package.json .
-RUN npm install --production
-COPY . .
-EXPOSE 8080
-CMD ["node", "server.mjs"]
-`);
-
-    // fly.toml
-    await writeFile(join(serverDir, 'fly.toml'), `app = "${appName}"
-primary_region = "ord"
-
-[build]
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = "stop"
-  auto_start_machines = true
-  min_machines_running = 0
-
-[[vm]]
-  memory = "256mb"
-  cpu_kind = "shared"
-  cpus = 1
-`);
-
+    await writeCacheServer(serverDir, appName);
     spinner.succeed('Cache server generated');
   } catch (err) {
     spinner.fail('Failed to generate cache server');
@@ -163,7 +134,7 @@ primary_region = "ord"
 
   if (!deploy) {
     console.log(chalk.gray(`  Server files saved to ${serverDir}`));
-    console.log(chalk.gray('  Deploy manually: cd .agent-cache-server && fly launch --no-deploy && fly secrets set MCP_TOKEN=<token in .claude/.cache-env> && fly deploy'));
+    console.log(chalk.gray('  Deploy manually: cd .agent-cache-server && fly launch --no-deploy && fly volumes create cache_data --size 1 --region ord --yes && fly secrets set MCP_TOKEN=<token in .claude/.cache-env> && fly deploy --ha=false'));
     return { url: `https://${appName}.fly.dev`, token, serverDir, deployed: false };
   }
 
@@ -177,7 +148,14 @@ primary_region = "ord"
     // token lives in a Fly secret, not in the generated server files
     execSync(`cd "${serverDir}" && flyctl secrets set MCP_TOKEN=${token} --stage`, { stdio: 'pipe' });
 
-    execSync(`cd "${serverDir}" && flyctl deploy`, {
+    // the store lives on this volume so auto-stopped machines keep their cache
+    // (create only if missing: `volumes create` happily makes a second, billed, same-named volume)
+    const vols = execSync(`cd "${serverDir}" && flyctl volumes list --json`, { stdio: 'pipe' }).toString();
+    if (!vols.includes('"cache_data"')) {
+      execSync(`cd "${serverDir}" && flyctl volumes create cache_data --size 1 --region ord --yes`, { stdio: 'pipe' });
+    }
+
+    execSync(`cd "${serverDir}" && flyctl deploy --ha=false`, {
       stdio: 'pipe',
       timeout: 120000,
     });
@@ -212,76 +190,4 @@ primary_region = "ord"
   console.log('');
 
   return config;
-}
-
-function generateServerCode() {
-  return `import express from 'express';
-import bodyParser from 'body-parser';
-
-const app = express();
-const PORT = process.env.PORT || 8080;
-const AUTH_TOKEN = process.env.MCP_TOKEN;
-if (!AUTH_TOKEN) { console.error('MCP_TOKEN not set (fly secrets set MCP_TOKEN=...)'); process.exit(1); }
-
-app.use(bodyParser.json({ limit: '10mb' }));
-
-// In-memory cache with TTL
-const cache = new Map();
-
-function auth(req, res, next) {
-  const bearer = req.headers.authorization?.replace('Bearer ', '');
-  if (bearer !== AUTH_TOKEN) return res.status(401).json({ error: 'unauthorized' });
-  next();
-}
-
-// Health
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', entries: cache.size, uptime: process.uptime() });
-});
-
-// Cache set
-app.post('/mcp/cache-set', auth, (req, res) => {
-  const { key, value, ttl = 43200, original_bytes = null } = req.body;
-  if (!key) return res.status(400).json({ error: 'key required' });
-
-  const valueStr = JSON.stringify(value);
-  cache.set(key, {
-    value,
-    meta: {
-      value_bytes: valueStr.length,
-      original_bytes: original_bytes,
-      read_count: 0,
-      created_at: new Date().toISOString(),
-    },
-    expires_at: Date.now() + (ttl * 1000),
-  });
-
-  res.json({ ok: true, key });
-});
-
-// Cache get
-app.get('/mcp/cache-get/:key', auth, (req, res) => {
-  const entry = cache.get(req.params.key);
-
-  if (!entry || Date.now() > entry.expires_at) {
-    if (entry) cache.delete(req.params.key);
-    return res.json({ error: 'cache miss' });
-  }
-
-  entry.meta.read_count++;
-  res.json({ key: req.params.key, value: entry.value, meta: entry.meta });
-});
-
-// Cleanup expired entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of cache) {
-    if (now > entry.expires_at) cache.delete(key);
-  }
-}, 5 * 60 * 1000);
-
-app.listen(PORT, () => {
-  console.log(\`Cache server running on port \${PORT}\`);
-});
-`;
 }

@@ -4,10 +4,13 @@ import { router as cacheRouter } from './routes/cache.mjs';
 import { router as authRouter } from './routes/auth.mjs';
 import { router as billingRouter, webhookHandler } from './routes/billing.mjs';
 import { router as dashboardRouter } from './routes/dashboard.mjs';
-import { tenants } from './store.mjs';
+import { tenants, persist } from './store.mjs';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+// Every API call may mutate tenants/cache/stats: schedule a (coalesced) write afterwards.
+app.use(['/api', '/mcp', '/webhook'], (req, res, next) => { res.on('finish', persist); next(); });
 
 // Stripe webhook needs raw body — must come before bodyParser
 app.post('/webhook/stripe', bodyParser.raw({ type: 'application/json' }), webhookHandler);
@@ -43,6 +46,7 @@ setInterval(() => {
       if (now > entry.expires_at) tenant.cache.delete(key);
     }
   }
+  persist();
 }, 5 * 60 * 1000);
 
 app.listen(PORT, () => {

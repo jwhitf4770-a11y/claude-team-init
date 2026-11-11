@@ -6,6 +6,8 @@ export const router = Router();
 
 // Sign up — creates a free tenant and returns API key
 router.post('/signup', (req, res) => {
+  // A self-hosted server (MCP_TOKEN set) serves exactly one project; no public sign-ups.
+  if (process.env.MCP_TOKEN) return res.status(403).json({ error: 'signup disabled on self-hosted cache' });
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email required' });
 
