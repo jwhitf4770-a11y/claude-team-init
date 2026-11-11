@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, copyFile, readdir } from 'fs/promises';
+import { mkdir, copyFile, readdir, rm } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -24,7 +24,11 @@ async function install() {
   try {
     await mkdir(skillDestDir, { recursive: true });
     for (const skill of skills) {
-      await copyFile(join(skillSrcDir, skill), join(skillDestDir, skill));
+      // Claude Code loads skills from ~/.claude/skills/<name>/SKILL.md
+      const name = skill.replace('.md', '');
+      await mkdir(join(skillDestDir, name), { recursive: true });
+      await copyFile(join(skillSrcDir, skill), join(skillDestDir, name, 'SKILL.md'));
+      await rm(join(skillDestDir, skill), { force: true }); // old flat-file install
     }
     const names = skills.map(s => '/' + s.replace('.md', '')).join(', ');
     console.log(`  \u2714 Installed Claude Code skills: ${names}`);

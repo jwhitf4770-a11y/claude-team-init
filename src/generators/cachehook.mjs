@@ -1,4 +1,4 @@
-import { mkdir, writeFile, chmod } from 'fs/promises';
+import { mkdir, writeFile, readFile, chmod } from 'fs/promises';
 import { join } from 'path';
 
 export async function generateCachehook(projectDir, cacheConfig) {
@@ -10,6 +10,24 @@ export async function generateCachehook(projectDir, cacheConfig) {
   const hookPath = join(scriptsDir, 'cache-hook.sh');
   await writeFile(hookPath, generateHookScript(cacheConfig));
   await chmod(hookPath, 0o755);
+
+  // Secrets live in a gitignored env file, never in the generated scripts.
+  const envPath = join(projectDir, '.claude', '.cache-env');
+  await mkdir(join(projectDir, '.claude'), { recursive: true });
+  await writeFile(envPath, `FLYIO_URL="${cacheConfig.url}"\nFLYIO_TOKEN="${cacheConfig.token}"\n`);
+  await chmod(envPath, 0o600);
+  await ensureGitignore(projectDir, ['.claude/.cache-env', '.agent-cache-server/']);
+}
+
+// Append missing lines to .gitignore (idempotent).
+export async function ensureGitignore(projectDir, lines) {
+  const p = join(projectDir, '.gitignore');
+  let cur = '';
+  try { cur = await readFile(p, 'utf-8'); } catch {}
+  const have = new Set(cur.split('\n').map(l => l.trim()));
+  const add = lines.filter(l => !have.has(l));
+  if (add.length === 0) return;
+  await writeFile(p, cur + (cur && !cur.endsWith('\n') ? '\n' : '') + add.join('\n') + '\n');
 }
 
 function generateHookScript(config) {
@@ -19,8 +37,11 @@ function generateHookScript(config) {
 
 set -e
 
-FLYIO_URL="${config.url}"
-FLYIO_TOKEN="${config.token}"
+# URL + token come from the gitignored .claude/.cache-env (not stored in this script)
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.claude/.cache-env"
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
+FLYIO_URL="\${FLYIO_URL:-}"
+FLYIO_TOKEN="\${FLYIO_TOKEN:-}"
 DEFAULT_TTL=43200  # 12 hours
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -79,7 +100,7 @@ cache_set() {
 }
 
 cache_get() {
-  curl -s -X GET "$FLYIO_URL/mcp/cache-get/$1" \\
+  curl -s --max-time 5 -X GET "$FLYIO_URL/mcp/cache-get/$1" \\
     -H "Authorization: Bearer $FLYIO_TOKEN"
 }
 
@@ -109,7 +130,7 @@ log_agent_execution() {
 }
 
 check_server_health() {
-  local health=$(curl -s "$FLYIO_URL/health" 2>/dev/null || echo "{}")
+  local health=$(curl -s --max-time 5 "$FLYIO_URL/health" 2>/dev/null || echo "{}")
   if echo "$health" | grep -q '"status":"ok"'; then
     echo "Cache server healthy"
     return 0

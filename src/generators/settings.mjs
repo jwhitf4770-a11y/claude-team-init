@@ -15,9 +15,6 @@ export async function generateSettings(projectDir, audit) {
     // Doesn't exist, create it
   }
 
-  const buildCmd = audit.buildCmd || '';
-  const testCmd = audit.testCmd || '';
-
   const deny = [
     'Bash(git push*--force*)',
     'Bash(git push*-f *)',
@@ -25,14 +22,6 @@ export async function generateSettings(projectDir, audit) {
     'Bash(*git commit*--no-verify*)',
     'Bash(*git push*--no-verify*)',
   ];
-
-  // Block build/test from main session — force delegation to agents
-  if (buildCmd) {
-    deny.push(`Bash(${buildCmd}*)`);
-  }
-  if (testCmd) {
-    deny.push(`Bash(${testCmd}*)`);
-  }
 
   const settings = {
     permissions: {

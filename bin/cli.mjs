@@ -125,7 +125,6 @@ async function main() {
       console.log(`    ${chalk.gray(`.claude/agents/${agent.name}.md`)}`);
     }
     console.log(`    ${chalk.gray('.claude/settings.local.json')}`);
-    console.log(`    ${chalk.gray('.claude/rules.json')}`);
     console.log(`    ${chalk.gray('scripts/team-launch.sh')}`);
     if (!skipCache) console.log(`    ${chalk.gray('scripts/cache-hook.sh')}`);
     console.log(`    ${chalk.gray('CLAUDE.md')}`);

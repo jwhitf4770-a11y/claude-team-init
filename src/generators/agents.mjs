@@ -11,26 +11,6 @@ export async function generateAgents(projectDir, agentPlan, audit, cacheConfig) 
   }
 }
 
-function cacheBlock(agentName, cacheConfig) {
-  if (!cacheConfig) return '';
-  return `
-## Fly.io Cache Integration (MANDATORY)
-
-You are part of an agent team that shares state through a Fly.io cache. Log your execution at start and end. Hook: \`scripts/cache-hook.sh\`. All hook calls are best-effort — append \`|| true\` and never retry on failure.
-
-**First Bash command in your run:**
-\`\`\`bash
-FLYIO_START=$(date +%s); scripts/cache-hook.sh log-agent ${agentName} RUNNING 0 '{}' 2>/dev/null || true
-\`\`\`
-
-**Last Bash command in your run:**
-\`\`\`bash
-scripts/cache-hook.sh log-agent ${agentName} STATUS $(( ($(date +%s) - FLYIO_START) * 1000 )) '{}' 2>/dev/null || true
-\`\`\`
-
-`;
-}
-
 function generateAgentFile(agent, audit, cacheConfig) {
   const generators = {
     'build-gate': () => buildGate(audit, cacheConfig),
@@ -68,14 +48,8 @@ description: >
   Runs after code changes to verify the build passes. Fast, cheap, catches
   type errors and import breaks immediately. Use proactively after every
   code change — do not wait for the user to ask.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('build-gate', cache)}
 You are a build verification gate. Your job is to verify the build passes and report any errors. Focus audits on CHANGED files only — use \`git diff --name-only HEAD~1\` to scope.
 
 ## Process
@@ -135,14 +109,8 @@ description: >
   Final QA signoff before handing work back to the user. Requires PHYSICAL PROOF
   that changes work — actual curl responses, test output, query results. Reviews
   the full diff adversarially. Returns APPROVED or BLOCKED with evidence.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('qa-signoff', cache)}
 You are the final QA gate before code is handed to the user. You are skeptical by default — assume NOTHING works until you see physical proof. "It should work" is never acceptable.
 
 **The user does NOT test.** You are the user's testing proxy. If you approve, the user trusts it works. If something breaks after your approval, that's YOUR failure. Act accordingly.
@@ -249,14 +217,8 @@ description: >
   Verifies that code changes did not break existing behavior. Traces blast
   radius, runs targeted tests, and collects PHYSICAL PROOF (actual outputs,
   not assumptions) that existing functionality still works.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('regression-checker', cache)}
 You are a senior QA engineer doing regression analysis. Your job is to PROVE — with actual output — that recent code changes did not break existing behavior. "Should still work" is never acceptable.
 
 ## Process
@@ -345,17 +307,9 @@ description: >
   candidates, validates each through build-gate / regression-checker / qa-signoff,
   scores confidence, and iterates up to 5 rounds until 97% confidence
   (92% acceptable after round 5).
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
-  - Agent
+tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 ---
-${cacheBlock('orchestrator', cache)}${cache ? `
+${cache ? `
 **Read your SESSION_ID from the system prompt.** It will be provided via \`--append-system-prompt\`. If no SESSION_ID is provided, generate one: \`orch-$(date +%s | tail -c 5)\`.
 
 \`\`\`bash
@@ -560,17 +514,8 @@ description: >
   Senior engineer code review for your entire codebase. Finds dead code,
   duplication, bad patterns, inefficiencies, security holes, missing tests,
   and structural issues. Writes a plain-English report with fix priorities.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
-  - Agent
+tools: Bash, Read, Write, Edit, Grep, Glob, Agent
 ---
-${cacheBlock('team-audit', cache)}
 ## Your Role
 
 You are a senior engineer doing a full code review for a developer who built this with AI
@@ -583,7 +528,7 @@ Be honest but kind. These devs shipped something — that's great. Now help them
 
 \`\`\`bash
 # What is this project?
-cat README.md 2>/dev/null || cat package.json 2>/dev/null
+head -c 3000 README.md 2>/dev/null || head -c 3000 package.json 2>/dev/null
 # Project structure
 find . -maxdepth 3 -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.next/*' -not -path '*/dist/*' | head -150
 # Git activity — how active, how many contributors?
@@ -598,7 +543,7 @@ Find code that's never used — AI tools love generating extra stuff.
 ### Unused exports
 \`\`\`bash
 # Find all exports, then check if they're imported anywhere
-grep -rn "export " --include="*.{ts,tsx,js,jsx,mjs}" . | grep -v node_modules | grep -v ".next" | grep -v "dist/"
+grep -rn "export " --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" --include="*.mjs" . | grep -v node_modules | grep -v ".next" | grep -v "dist/" | head -300
 \`\`\`
 For each export, grep for its name in other files. If nothing imports it, it's dead.
 
@@ -842,7 +787,7 @@ After all fixes are applied:
 ${cache ? `
 ## Cache
 \`\`\`bash
-scripts/cache-hook.sh set "team-audit-result" "$(head -80 TEAM-AUDIT-REPORT.md)" 43200 2>/dev/null || true
+scripts/cache-hook.sh set "team-audit-result" "{\\"report\\":\\"TEAM-AUDIT-REPORT.md\\",\\"done\\":true}" 43200 2>/dev/null || true
 \`\`\`
 ` : ''}
 ## Rules
@@ -864,16 +809,8 @@ description: >
   Fast agent team evaluation. Reads the codebase and agent definitions,
   identifies coverage gaps, redundancies, and tier mismatches. Does NOT
   run agents — just evaluates whether the team is right for this codebase.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
+tools: Bash, Read, Write, Edit, Grep, Glob
 ---
-${cacheBlock('team-review', cache)}
 ## Your Role
 
 You are an agent architect. Your job is to evaluate whether the current agent team
@@ -913,7 +850,7 @@ Read each agent file. For every agent, evaluate:
 ### Coverage Check
 - Does this agent's scope match actual code in the project?
 - Is the agent's prompt specific enough for THIS stack? (generic "check auth" vs "verify Supabase RLS policies")
-- Are the allowed_tools sufficient for what the agent needs to do?
+- Is the tools list sufficient for what the agent needs to do?
 
 ### Tier Check
 - **Haiku** — simple pass/fail checks, running commands, reporting output
@@ -1022,16 +959,8 @@ description: >
   Writes focused tests for new features and bug fixes.
   Covers happy path, edge cases, and failure paths. Also acts as the
   e2e / release-gate architect when asked to audit coverage.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
+tools: Bash, Read, Write, Edit, Grep, Glob
 ---
-${cacheBlock('test-writer', cache)}
 You write tests. Match the existing test style and patterns in this project (runner: \`${runner}\`).
 
 ## Two-Tier Philosophy
@@ -1088,14 +1017,8 @@ description: >
   Cheap physical proof collector. Curls API endpoints after changes and returns
   the ACTUAL response bodies. Use after any API route or server action change
   to collect evidence that the endpoint works. Pennies per run.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('api-prober', cache)}
 You are a physical proof collector. Your ONLY job is to hit API endpoints and report what they ACTUALLY return. You do not analyze, suggest fixes, or interpret — you just collect evidence.
 
 ## Process
@@ -1170,14 +1093,8 @@ model: sonnet
 description: >
   Validates authentication and authorization flows.
   Checks that auth is not bypassed or weakened.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('auth-verifier', cache)}
 You audit auth flows for ${audit.auth || 'this project'}.
 
 ## Process
@@ -1201,14 +1118,8 @@ name: billing-bot
 model: sonnet
 description: >
   Validates payment and subscription logic (${audit.payments || 'payments'}).
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('billing-bot', cache)}
 You audit payment/billing code for ${audit.payments || 'this project'}.
 
 ## Process
@@ -1232,14 +1143,8 @@ name: upload-bot
 model: sonnet
 description: >
   Validates upload and storage logic (${audit.storage || 'storage'}).
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('upload-bot', cache)}
 You audit upload/storage code for ${audit.storage || 'this project'}.
 
 ## Process
@@ -1263,14 +1168,8 @@ name: security-reviewer
 model: sonnet
 description: >
   Audits database access, RLS policies, and data security (${audit.database || 'database'}).
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('security-reviewer', cache)}
 You audit data access security for ${audit.database || 'this project'}.
 
 ## Process
@@ -1339,14 +1238,8 @@ name: mobile-expert
 model: sonnet
 description: >
   Checks that backend changes don't break ${platformLabel}.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('mobile-expert', cache)}
 You verify mobile compatibility when backend code changes. Target platforms: **${platformLabel}**.
 
 ## Process
@@ -1369,14 +1262,8 @@ name: crypto-auditor
 model: sonnet
 description: >
   Audits encryption and cryptographic code for correctness and security.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('crypto-auditor', cache)}
 You audit cryptographic code.
 
 ## Process
@@ -1397,7 +1284,7 @@ VERDICT: PASS | BLOCKED
 function infraAuditor(audit, cache) {
   const hasFly = audit.hasFly || false;
   const hasVercel = audit.deploy === 'vercel' || false;
-  const hasSupabase = audit.database === 'supabase' || false;
+  const hasSupabase = audit.database === 'Supabase';
   return `---
 name: infra-auditor
 model: haiku
@@ -1405,14 +1292,8 @@ description: >
   Infrastructure waste and efficiency auditor. Checks Fly.io apps, Vercel config,
   Supabase projects, and package.json for orphan resources, idle services, cron
   frequency waste, and unused packages. Runs on infra config changes. Pennies per run.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock('infra-auditor', cache)}
 You are an infrastructure auditor. Catch waste before it compounds. Be specific — give actual numbers, not generic advice. Every finding needs a dollar amount or invocation count.
 
 ## Triggers
@@ -1469,7 +1350,7 @@ VERDICT: CLEAN | WASTE_FOUND
 }
 
 function securityPatcher(audit, cache) {
-  const pkgManager = audit.packageManager || 'npm';
+  const pkgManager = audit.packageMgr || 'npm';
   return `---
 name: security-patcher
 model: haiku
@@ -1477,14 +1358,8 @@ description: >
   Automated Dependabot/npm audit resolver. Runs on every package.json change.
   Patches what it can at 97% confidence (patch + minor updates, npm overrides for
   transitive deps), dismisses already-fixed alerts, flags what requires manual review.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Edit
-  - Glob
+tools: Bash, Read, Edit, Glob
 ---
-${cacheBlock('security-patcher', cache)}
 You are a security vulnerability patcher. Fix what you can safely. Flag what you can't. Never use --force without explicit instruction.
 
 ## Process
@@ -1556,15 +1431,8 @@ description: >
   traffic tier and recommends the right backend (in-memory / Vercel KV / Upstash Redis).
   Runs three-fix protocol when rate limiting code changes. Prevents both over-engineering
   at pre-launch and under-engineering at scale.
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Edit
-  - Grep
-  - Glob
+tools: Bash, Read, Edit, Grep, Glob
 ---
-${cacheBlock('rate-limit-specialist', cache)}
 You are a rate limiting specialist. The right rate limiter depends on traffic tier, not on what's architecturally cleanest. Never recommend Upstash/Redis if in-memory is sufficient for current scale.
 
 ## Decision framework
@@ -1633,14 +1501,8 @@ name: ${agent.name}
 model: ${agent.model}
 description: >
   ${agent.reason}
-permission_mode: default
-allowed_tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
+tools: Bash, Read, Grep, Glob
 ---
-${cacheBlock(agent.name, cache)}
 You are the ${agent.name} agent. ${agent.reason}.
 
 ## Process
